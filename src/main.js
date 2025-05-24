@@ -2,6 +2,7 @@ import './assets/main.css'
 import 'bootstrap/dist/css/bootstrap.min.css'
 import 'bootstrap/dist/js/bootstrap.bundle.min.js'
 import 'bootstrap-icons/font/bootstrap-icons.css'
+import '@fortawesome/fontawesome-free/css/all.min.css'
 
 import { createApp } from 'vue'
 import { createStore } from 'vuex'
@@ -10,7 +11,7 @@ import App from './App.vue'
 
 // Import components for routing
 import Login from './views/Login.vue'
-import AdminDashboard from './views/AdminDashboard.vue'
+import Dashboard from './views/admin/Dashboard.vue'
 import SetupAdmin from './views/SetupAdmin.vue'
 import MainCategories from './views/admin/MainCategories.vue'
 import SubCategories from './views/admin/SubCategories.vue'
@@ -18,6 +19,8 @@ import DifficultyLevels from './views/admin/DifficultyLevels.vue'
 import WorkoutPlans from './views/admin/WorkoutPlans.vue'
 import Exercises from './views/admin/Exercises.vue'
 import Users from './views/admin/Users.vue'
+import ImageManager from './views/admin/ImageManager.vue'
+import UserWorkouts from './views/admin/UserWorkouts.vue'
 
 // Auth guard
 import { auth } from './firebase/config'
@@ -109,19 +112,56 @@ const routes = [
     path: '/setup-admin', 
     component: SetupAdmin 
   },
+  // Admin routes
   { 
-    path: '/admin', 
-    component: AdminDashboard,
-    meta: { requiresAdmin: true },
-    children: [
-      { path: '', redirect: 'main-categories' }, // Default child route
-      { path: 'main-categories', component: MainCategories },
-      { path: 'sub-categories', component: SubCategories },
-      { path: 'difficulty-levels', component: DifficultyLevels },
-      { path: 'workout-plans', component: WorkoutPlans },
-      { path: 'exercises', component: Exercises },
-      { path: 'users', component: Users }
-    ]
+    path: '/admin/dashboard', 
+    component: Dashboard,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/main-categories', 
+    component: MainCategories,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/sub-categories', 
+    component: SubCategories,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/difficulty-levels', 
+    component: DifficultyLevels,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/workout-plans', 
+    component: WorkoutPlans,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/exercises', 
+    component: Exercises,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/users', 
+    component: Users,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/images', 
+    component: ImageManager,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/user-workouts', 
+    component: UserWorkouts,
+    meta: { requiresAdmin: true }
+  },
+  // Redirect for admin path
+  {
+    path: '/admin',
+    redirect: '/admin/dashboard'
   },
   // Catch-all route for any unmatched routes
   {
@@ -144,9 +184,15 @@ router.beforeEach((to, from, next) => {
   console.log(`Navigation to: ${to.path}`);
   console.log(`Current auth state: user=${currentUser?.email || 'none'}, isAdmin=${store.state.isAdmin}, isAuthenticated=${store.state.isAuthenticated}`);
   
-  // Allow access to setup-admin page without authentication checks
-  if (to.path === '/setup-admin') {
-    console.log('Allowing access to setup-admin page');
+  // Allow access to setup-admin and login pages without authentication checks
+  if (to.path === '/setup-admin' || to.path === '/login') {
+    console.log('Allowing direct access to:', to.path);
+    next();
+    return;
+  }
+  
+  // Đảm bảo rằng trang login luôn có thể truy cập được
+  if (to.path === '/login') {
     next();
     return;
   }
@@ -172,13 +218,19 @@ router.beforeEach((to, from, next) => {
   function checkNavigationRules() {
     console.log(`Checking navigation rules: isAdmin=${store.state.isAdmin}, requiresAdmin=${requiresAdmin}, requiresGuest=${requiresGuest}`);
     
+    // Always allow access to login page
+    if (to.path === '/login') {
+      next();
+      return;
+    }
+    
     if (requiresAdmin && !store.state.isAdmin) {
       console.log('Admin route requested but user is not admin, redirecting to login');
       next('/login');
     } else if (requiresGuest && store.state.isAuthenticated) {
       // If user is logged in and tries to access login page, redirect to admin dashboard
       console.log('User is authenticated but trying to access guest page, redirecting to admin dashboard');
-      next('/admin/main-categories');
+      next('/admin/dashboard');
     } else {
       console.log('Navigation allowed');
       next();
@@ -193,17 +245,14 @@ const app = createApp(App);
 app.use(store);
 app.use(router);
 
-// Setup authentication observer
-let appMounted = false;
+// Đảm bảo ứng dụng luôn được mount ngay cả khi chưa xác thực
+app.mount('#app');
+
+// Setup authentication observer sau khi đã mount ứng dụng
 onAuthStateChanged(auth, (user) => {
   console.log(`Global auth state changed: user=${user?.email || 'none'}`);
   store.commit('setUser', user);
   store.dispatch('checkUserRole', user).then(() => {
     console.log(`Global checkUserRole completed: isAdmin=${store.state.isAdmin}, isAuthenticated=${store.state.isAuthenticated}`);
-    if (!appMounted) {
-      app.mount('#app');
-      appMounted = true;
-      console.log('App mounted');
-    }
   });
 });

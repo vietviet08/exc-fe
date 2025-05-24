@@ -11,8 +11,8 @@ import {
   query,
   orderBy
 } from 'firebase/firestore';
-import { ref as storageRef, uploadBytes, getDownloadURL, deleteObject } from 'firebase/storage';
-import { db, storage } from '../../firebase/config';
+import { db } from '../../firebase/config';
+import { cloudinaryService } from '@/services/cloudinary';
 
 // State
 const categories = ref([]);
@@ -66,9 +66,22 @@ const handleFileChange = (event) => {
 const uploadIcon = async (file, categoryId) => {
   if (!file) return null;
   
-  const iconRef = storageRef(storage, `main_categories/${categoryId}/${file.name}`);
-  await uploadBytes(iconRef, file);
-  return await getDownloadURL(iconRef);
+  try {
+    // Upload to Cloudinary
+    const response = await cloudinaryService.uploadImage(file, {
+      folder: 'main_categories',
+      publicId: `category_${categoryId}`
+    });
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Failed to upload image');
+    }
+    
+    return response.url;
+  } catch (error) {
+    console.error('Error uploading image:', error);
+    throw error;
+  }
 };
 
 // Add new category
@@ -126,17 +139,6 @@ const updateCategory = async () => {
     
     // Upload new icon if selected
     if (selectedFile.value) {
-      // Delete old icon if exists
-      if (selectedCategory.value.icon_url) {
-        try {
-          const oldIconRef = storageRef(storage, selectedCategory.value.icon_url);
-          await deleteObject(oldIconRef);
-        } catch (err) {
-          console.error('Error deleting old icon:', err);
-          // Continue with update even if deletion fails
-        }
-      }
-      
       // Upload new icon
       const iconUrl = await uploadIcon(selectedFile.value, selectedCategory.value.id);
       currentCategory.value.icon_url = iconUrl;
@@ -177,17 +179,6 @@ const deleteCategory = async () => {
   processing.value = true;
   
   try {
-    // Delete icon if exists
-    if (selectedCategory.value.icon_url) {
-      try {
-        const iconRef = storageRef(storage, selectedCategory.value.icon_url);
-        await deleteObject(iconRef);
-      } catch (err) {
-        console.error('Error deleting icon:', err);
-        // Continue with deletion even if icon deletion fails
-      }
-    }
-    
     // Delete document
     await deleteDoc(doc(db, 'main_categories', selectedCategory.value.id));
     

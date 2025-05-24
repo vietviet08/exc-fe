@@ -23,7 +23,7 @@ onMounted(() => {
       store.dispatch('checkUserRole', user).then((result) => {
         console.log(`CheckUserRole result for ${user.email}:`, store.state.isAdmin);
         if (store.state.isAdmin) {
-          router.push('/admin/main-categories');
+          router.push('/admin/dashboard');
         }
       });
     } else {
@@ -52,7 +52,7 @@ const login = async () => {
     
     if (store.state.isAdmin) {
       console.log(`User ${user.email} authenticated as admin, redirecting to dashboard`);
-      router.push('/admin/main-categories');
+      router.push('/admin/dashboard');
     } else {
       // Not an admin, show error
       console.error(`User ${user.email} is not an admin`);

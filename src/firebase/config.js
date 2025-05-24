@@ -16,6 +16,13 @@ const firebaseConfig = {
   measurementId: "G-1RZFGCTHSF"
 };
 
+
+console.log("Firebase configuration loaded:", { 
+  projectId: firebaseConfig.projectId,
+  hasApiKey: !!firebaseConfig.apiKey,
+  hasAuthDomain: !!firebaseConfig.authDomain
+});
+
 // Initialize Firebase
 const app = initializeApp(firebaseConfig);
 const auth = getAuth(app);

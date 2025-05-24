@@ -1,16 +1,37 @@
 <script setup>
-import { ref } from 'vue';
+import { ref, onMounted } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
-import { signInWithEmailAndPassword } from 'firebase/auth';
+import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/config';
 
 const email = ref('');
 const password = ref('');
 const error = ref('');
 const loading = ref(false);
+const processingAuth = ref(true);
 const router = useRouter();
 const store = useStore();
+
+// Check authentication state on component mount
+onMounted(() => {
+  const unsubscribe = onAuthStateChanged(auth, (user) => {
+    processingAuth.value = false;
+    if (user) {
+      // User is already logged in, check role and redirect
+      store.dispatch('checkUserRole', user).then(() => {
+        if (store.state.isAdmin) {
+          router.push('/admin/main-categories');
+        } else {
+          router.push('/dashboard');
+        }
+      });
+    }
+  });
+  
+  // Clean up subscription
+  return () => unsubscribe();
+});
 
 const login = async () => {
   error.value = '';
@@ -31,14 +52,19 @@ const login = async () => {
     }
   } catch (err) {
     error.value = err.message;
-  } finally {
     loading.value = false;
   }
 };
 </script>
 
 <template>
-  <div class="login-container">
+  <div v-if="processingAuth" class="d-flex justify-content-center align-items-center" style="height: 100vh;">
+    <div class="spinner-border text-primary" role="status">
+      <span class="visually-hidden">Loading...</span>
+    </div>
+  </div>
+  
+  <div v-else class="login-container">
     <div class="login-wrapper">
       <!-- Logo -->
       <div class="text-center mb-5">

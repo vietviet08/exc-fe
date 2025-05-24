@@ -1,19 +1,31 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
+import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { auth } from '../firebase/config';
 import { onAuthStateChanged } from 'firebase/auth';
 import Navigation from '../components/Navigation.vue';
 
+const router = useRouter();
 const store = useStore();
 const userName = ref('');
+const loading = ref(true);
+
+const user = computed(() => store.state.user);
 
 onMounted(() => {
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      userName.value = user.displayName || user.email.split('@')[0];
+  const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+    if (currentUser) {
+      userName.value = currentUser.displayName || currentUser.email.split('@')[0];
+      loading.value = false;
+    } else {
+      // If no user is authenticated, redirect to login
+      router.push('/login');
     }
   });
+
+  // Clean up the subscription when component unmounts
+  return () => unsubscribe();
 });
 </script>
 
@@ -21,7 +33,13 @@ onMounted(() => {
   <div class="dashboard-container">
     <Navigation />
     
-    <div class="dashboard-content">
+    <div v-if="loading" class="d-flex justify-content-center align-items-center" style="height: 100vh;">
+      <div class="spinner-border text-primary" role="status">
+        <span class="visually-hidden">Loading...</span>
+      </div>
+    </div>
+    
+    <div v-else class="dashboard-content">
       <div class="container py-5">
         <div class="row">
           <div class="col-12">

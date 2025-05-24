@@ -1,16 +1,29 @@
 <script setup>
+import { ref, computed } from 'vue';
 import { useRouter } from 'vue-router';
+import { useStore } from 'vuex';
 import { auth } from '../firebase/config';
 import { signOut } from 'firebase/auth';
 
 const router = useRouter();
+const store = useStore();
+const isLoggingOut = ref(false);
+
+const user = computed(() => store.state.user);
+const userName = computed(() => {
+  if (!user.value) return '';
+  return user.value.displayName || user.value.email.split('@')[0];
+});
 
 const logout = async () => {
   try {
+    isLoggingOut.value = true;
     await signOut(auth);
     router.push('/login');
   } catch (error) {
     console.error('Error signing out:', error);
+  } finally {
+    isLoggingOut.value = false;
   }
 };
 </script>
@@ -37,8 +50,12 @@ const logout = async () => {
             <a class="nav-link" href="#">Profile</a>
           </li>
         </ul>
-        <div class="d-flex">
-          <button @click="logout" class="btn btn-light">Logout</button>
+        <div class="d-flex align-items-center">
+          <span class="text-light me-3">Hi, {{ userName }}</span>
+          <button @click="logout" class="btn btn-light" :disabled="isLoggingOut">
+            <span v-if="isLoggingOut" class="spinner-border spinner-border-sm me-1" role="status" aria-hidden="true"></span>
+            Logout
+          </button>
         </div>
       </div>
     </div>

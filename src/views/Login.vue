@@ -18,14 +18,16 @@ onMounted(() => {
   const unsubscribe = onAuthStateChanged(auth, (user) => {
     processingAuth.value = false;
     if (user) {
+      console.log("Authentication state detected user:", user.email);
       // User is already logged in, check role and redirect
-      store.dispatch('checkUserRole', user).then(() => {
+      store.dispatch('checkUserRole', user).then((result) => {
+        console.log(`CheckUserRole result for ${user.email}:`, store.state.isAdmin);
         if (store.state.isAdmin) {
           router.push('/admin/main-categories');
-        } else {
-          router.push('/dashboard');
         }
       });
+    } else {
+      console.log("No authenticated user detected");
     }
   });
   
@@ -38,20 +40,33 @@ const login = async () => {
   loading.value = true;
   
   try {
+    console.log(`Attempting login with email: ${email.value}`);
+    
     const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
     const user = userCredential.user;
+    console.log(`Login successful for user: ${user.email}, uid: ${user.uid}`);
     
     // Check user role
+    console.log("Checking user role for admin permissions");
     await store.dispatch('checkUserRole', user);
     
     if (store.state.isAdmin) {
+      console.log(`User ${user.email} authenticated as admin, redirecting to dashboard`);
       router.push('/admin/main-categories');
     } else {
-      // Regular user - redirect to user dashboard
-      router.push('/dashboard');
+      // Not an admin, show error
+      console.error(`User ${user.email} is not an admin`);
+      error.value = 'Access denied. Only administrators can access this application.';
+      await auth.signOut();
     }
   } catch (err) {
-    error.value = err.message;
+    console.error("Login error:", err);
+    if (err.code === 'auth/user-not-found' || err.code === 'auth/wrong-password') {
+      error.value = 'Invalid email or password.';
+    } else {
+      error.value = `Error: ${err.message}`;
+    }
+  } finally {
     loading.value = false;
   }
 };
@@ -74,21 +89,24 @@ const login = async () => {
       
       <!-- Login Card -->
       <div class="login-card">
-        <h3 class="text-center mb-3">Welcome Back!</h3>
-        <p class="text-center text-muted mb-5">Sign in to continue to Minible.</p>
+        <h3 class="text-center mb-3">Admin Login</h3>
+        <p class="text-center text-muted mb-3">Sign in to access the admin dashboard</p>
+        <p class="text-center text-danger fw-bold mb-4">
+          This application is restricted to administrators only
+        </p>
         
         <div v-if="error" class="alert alert-danger">{{ error }}</div>
         
         <form @submit.prevent="login">
           <!-- Email Field -->
           <div class="mb-4">
-            <label for="email" class="form-label">Email</label>
+            <label for="email" class="form-label">Admin Email</label>
             <input 
               v-model="email" 
               type="email" 
               class="form-control" 
               id="email" 
-              placeholder="admin@gmail.com"
+              placeholder="admin@example.com"
               required
               autocomplete="email" 
             />
@@ -128,11 +146,12 @@ const login = async () => {
           </button>
         </form>
         
-      
-        
-        <!-- Signup Link -->
+        <!-- Footer note about admin access -->
         <div class="text-center mt-4">
-          <p>Don't have an account? <a href="#">Signup now</a></p>
+          <p class="text-muted small mb-2">If you need admin access, please contact the system administrator.</p>
+          <p class="small">
+            <router-link to="/setup-admin" class="text-decoration-none">Create an admin account</router-link>
+          </p>
         </div>
       </div>
       

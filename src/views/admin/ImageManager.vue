@@ -228,10 +228,10 @@ export default {
                   </div>
                   <div class="image-actions">
                     <button class="btn btn-sm btn-info" @click="copyToClipboard(image.url)" title="Copy URL">
-                      <i class="fa fa-link"></i>
+                      <i class="fa fa-copy"></i>
                     </button>
                     <button class="btn btn-sm btn-danger" @click="deleteImage(image)" title="Delete">
-                      <i class="fa fa-trash"></i>
+                      <i class="fa fa-trash-can"></i>
                     </button>
                   </div>
                 </div>

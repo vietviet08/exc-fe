@@ -37,7 +37,12 @@ const toggleSidebar = () => {
          class="sidebar" 
          :class="{ 'collapsed': sidebarCollapsed }">
       <div class="sidebar-header">
-        <h3>Workout Admin</h3>
+        <div class="d-flex align-items-center">
+          <div class="logo-container me-2">
+            <img src="@/assets/logo.png" alt="Logo" class="sidebar-logo w-100 h-100" />
+          </div>
+          <h3>GORDON</h3>
+        </div>
         <button class="btn btn-sm btn-outline-light d-lg-none" @click="toggleSidebar">
           <i class="bi bi-x"></i>
         </button>
@@ -160,6 +165,24 @@ body {
   justify-content: space-between;
   align-items: center;
   border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.logo-container {
+  background-color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
 }
 
 .sidebar ul {

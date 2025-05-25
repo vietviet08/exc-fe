@@ -81,15 +81,12 @@ const login = async () => {
   
   <div v-else class="login-container">
     <div class="login-wrapper">
-      <!-- Logo -->
-      <div class="text-center mb-5">
-        <img src="@/assets/logo.svg" alt="Logo" class="logo" />
-        <h2 class="app-name">HOME WORKOUT</h2>
-      </div>
+      
       
       <!-- Login Card -->
       <div class="login-card">
-        <h3 class="text-center mb-3">Admin Login</h3>
+      
+      
         <p class="text-center text-muted mb-3">Sign in to access the admin dashboard</p>
         <p class="text-center text-danger fw-bold mb-4">
           This application is restricted to administrators only
@@ -182,16 +179,46 @@ const login = async () => {
   align-items: center;
 }
 
+
+.logo-container {
+  background-color: white;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  display: flex;
+  overflow: hidden;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+.sidebar-logo {
+  width: 32px;
+  height: 32px;
+  object-fit: contain;
+}
+
 .logo {
-  height: 50px;
-  margin-bottom: 15px;
+  height: 60px;
+  width: auto;
+  max-width: 100%;
+  object-fit: contain;
 }
 
 .app-name {
-  font-weight: bold;
+  font-weight: 700;
   font-size: 2rem;
   color: #333;
   margin-bottom: 0;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.tagline {
+  color: #6c757d;
+  font-size: 1rem;
+  margin-top: 5px;
+  font-style: italic;
 }
 
 .login-card {

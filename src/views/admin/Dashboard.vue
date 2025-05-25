@@ -14,7 +14,7 @@ export default {
         {
           title: 'Total Users',
           value: 1250,
-          icon: 'fa-users',
+          icon: 'fa-user',
           color: 'primary',
           percentChange: 5.3,
           subtitle: 'since last month'
@@ -22,7 +22,7 @@ export default {
         {
           title: 'Active Workouts',
           value: 452,
-          icon: 'fa-dumbbell',
+          icon: 'fa-heart',
           color: 'success',
           percentChange: 3.2,
           subtitle: 'since last week'
@@ -36,9 +36,9 @@ export default {
           subtitle: 'since last month'
         },
         {
-          title: 'Avg. Completion Rate',
+          title: 'Completion Rate',
           value: '78%',
-          icon: 'fa-chart-line',
+          icon: 'fa-chart-bar',
           color: 'warning',
           percentChange: 4.6,
           subtitle: 'since last month'

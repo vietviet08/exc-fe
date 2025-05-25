@@ -13,14 +13,14 @@ import App from './App.vue'
 import Login from './views/Login.vue'
 import Dashboard from './views/admin/Dashboard.vue'
 import SetupAdmin from './views/SetupAdmin.vue'
-import MainCategories from './views/admin/MainCategories.vue'
-import SubCategories from './views/admin/SubCategories.vue'
-import DifficultyLevels from './views/admin/DifficultyLevels.vue'
-import WorkoutPlans from './views/admin/WorkoutPlans.vue'
+import Categories from './views/admin/Categories.vue'
+import WorkoutTypes from './views/admin/WorkoutTypes.vue'
+import Levels from './views/admin/Levels.vue'
 import Exercises from './views/admin/Exercises.vue'
+import WorkoutSessions from './views/admin/WorkoutSessions.vue'
+import UserProgress from './views/admin/UserProgress.vue'
 import Users from './views/admin/Users.vue'
 import ImageManager from './views/admin/ImageManager.vue'
-import UserWorkouts from './views/admin/UserWorkouts.vue'
 
 // Auth guard
 import { auth } from './firebase/config'
@@ -119,28 +119,33 @@ const routes = [
     meta: { requiresAdmin: true }
   },
   { 
-    path: '/admin/main-categories', 
-    component: MainCategories,
+    path: '/admin/categories', 
+    component: Categories,
     meta: { requiresAdmin: true }
   },
   { 
-    path: '/admin/sub-categories', 
-    component: SubCategories,
+    path: '/admin/workout-types', 
+    component: WorkoutTypes,
     meta: { requiresAdmin: true }
   },
   { 
-    path: '/admin/difficulty-levels', 
-    component: DifficultyLevels,
-    meta: { requiresAdmin: true }
-  },
-  { 
-    path: '/admin/workout-plans', 
-    component: WorkoutPlans,
+    path: '/admin/levels', 
+    component: Levels,
     meta: { requiresAdmin: true }
   },
   { 
     path: '/admin/exercises', 
     component: Exercises,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/workout-sessions', 
+    component: WorkoutSessions,
+    meta: { requiresAdmin: true }
+  },
+  { 
+    path: '/admin/user-progress', 
+    component: UserProgress,
     meta: { requiresAdmin: true }
   },
   { 
@@ -151,11 +156,6 @@ const routes = [
   { 
     path: '/admin/images', 
     component: ImageManager,
-    meta: { requiresAdmin: true }
-  },
-  { 
-    path: '/admin/user-workouts', 
-    component: UserWorkouts,
     meta: { requiresAdmin: true }
   },
   // Redirect for admin path

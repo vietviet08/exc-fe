@@ -1,82 +1,93 @@
 /**
  * Exercise Model
- * Matches the Android model: com.example.nammoadidaphat.domain.model.Exercise
+ * Based on the database schema design
  */
 export class Exercise {
   constructor({
-    exercise_id = '',
+    id = '',
+    levelId = '',
     name = '',
-    name_en = '',
     description = '',
     instructions = [],
-    thumbnail_url = '',
-    video_url = '',
-    gif_url = '',
-    target_muscles = [],
-    equipment_needed = [],
-    calories_per_minute = 0,
-    is_time_default = false,
-    is_reps_based = true,
-    created_at = null,
-    updated_at = null
+    duration = 0,
+    reps = 0,
+    restTime = 0,
+    image = '',
+    video = '',
+    tips = [],
+    muscleGroups = [],
+    equipment = '',
+    caloriesBurn = 0,
+    order = 0,
+    isActive = true,
+    createdAt = null,
+    updatedAt = null
   } = {}) {
-    this.exercise_id = exercise_id;
+    this.id = id;
+    this.levelId = levelId;
     this.name = name;
-    this.name_en = name_en;
     this.description = description;
     this.instructions = instructions;
-    this.thumbnail_url = thumbnail_url;
-    this.video_url = video_url;
-    this.gif_url = gif_url;
-    this.target_muscles = target_muscles;
-    this.equipment_needed = equipment_needed;
-    this.calories_per_minute = calories_per_minute;
-    this.is_time_default = is_time_default;
-    this.is_reps_based = is_reps_based;
-    this.created_at = created_at;
-    this.updated_at = updated_at;
+    this.duration = duration;
+    this.reps = reps;
+    this.restTime = restTime;
+    this.image = image;
+    this.video = video;
+    this.tips = tips;
+    this.muscleGroups = muscleGroups;
+    this.equipment = equipment;
+    this.caloriesBurn = caloriesBurn;
+    this.order = order;
+    this.isActive = isActive;
+    this.createdAt = createdAt;
+    this.updatedAt = updatedAt;
   }
 
   // Convert Firestore document to Exercise object
   static fromFirestore(doc) {
     const data = doc.data();
     return new Exercise({
-      exercise_id: doc.id,
+      id: doc.id,
+      levelId: data.levelId || '',
       name: data.name || '',
-      name_en: data.name_en || '',
       description: data.description || '',
       instructions: data.instructions || [],
-      thumbnail_url: data.thumbnail_url || '',
-      video_url: data.video_url || '',
-      gif_url: data.gif_url || '',
-      target_muscles: data.target_muscles || [],
-      equipment_needed: data.equipment_needed || [],
-      calories_per_minute: data.calories_per_minute || 0,
-      is_time_default: data.is_time_default === true,
-      is_reps_based: data.is_reps_based !== false, // default to true if not specified
-      created_at: data.created_at ? data.created_at.toDate() : null,
-      updated_at: data.updated_at ? data.updated_at.toDate() : null
+      duration: data.duration || 0,
+      reps: data.reps || 0,
+      restTime: data.restTime || 0,
+      image: data.image || '',
+      video: data.video || '',
+      tips: data.tips || [],
+      muscleGroups: data.muscleGroups || [],
+      equipment: data.equipment || '',
+      caloriesBurn: data.caloriesBurn || 0,
+      order: data.order || 0,
+      isActive: data.isActive !== false,
+      createdAt: data.createdAt ? data.createdAt.toDate() : null,
+      updatedAt: data.updatedAt ? data.updatedAt.toDate() : null
     });
   }
 
   // Convert Exercise object to Firestore document
   toFirestore() {
-    const now = new Date();
     return {
+      levelId: this.levelId,
       name: this.name,
-      name_en: this.name_en,
       description: this.description,
       instructions: this.instructions,
-      thumbnail_url: this.thumbnail_url,
-      video_url: this.video_url,
-      gif_url: this.gif_url,
-      target_muscles: this.target_muscles,
-      equipment_needed: this.equipment_needed,
-      calories_per_minute: this.calories_per_minute,
-      is_time_default: this.is_time_default,
-      is_reps_based: this.is_reps_based,
-      created_at: this.created_at ? new Date(this.created_at) : now,
-      updated_at: now
+      duration: this.duration,
+      reps: this.reps,
+      restTime: this.restTime,
+      image: this.image,
+      video: this.video,
+      tips: this.tips,
+      muscleGroups: this.muscleGroups,
+      equipment: this.equipment,
+      caloriesBurn: this.caloriesBurn,
+      order: this.order,
+      isActive: this.isActive,
+      createdAt: this.createdAt ? new Date(this.createdAt) : new Date(),
+      updatedAt: new Date()
     };
   }
 } 

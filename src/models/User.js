@@ -1,38 +1,36 @@
 /**
  * User Model
- * Matches the Android model: com.example.nammoadidaphat.domain.model.User
+ * Based on the database schema design
  */
 export class User {
   constructor({
-    userId = '',
+    id = '',
     email = '',
-    passwordHash = '',
-    fullName = '',
-    avatarUrl = '',
+    displayName = '',
+    avatar = '',
     age = null,
     gender = '',
     height = null,
     weight = null,
     fitnessLevel = '',
-    goals = '',
-    isPremium = false,
-    createdAt = '',
-    updatedAt = '',
+    goals = [],
+    preferences = {},
+    createdAt = null,
+    updatedAt = null,
     authProvider = 'password', // "password", "google.com", "facebook.com"
     role = 'user' // "user" or "admin" - specific for web admin panel
   } = {}) {
-    this.userId = userId;
+    this.id = id;
     this.email = email;
-    this.passwordHash = passwordHash;
-    this.fullName = fullName;
-    this.avatarUrl = avatarUrl;
+    this.displayName = displayName;
+    this.avatar = avatar;
     this.age = age;
     this.gender = gender;
     this.height = height;
     this.weight = weight;
     this.fitnessLevel = fitnessLevel;
     this.goals = goals;
-    this.isPremium = isPremium;
+    this.preferences = preferences;
     this.createdAt = createdAt;
     this.updatedAt = updatedAt;
     this.authProvider = authProvider;
@@ -43,57 +41,52 @@ export class User {
   static fromFirestore(doc) {
     const data = doc.data();
     return new User({
-      userId: doc.id,
+      id: doc.id,
       email: data.email || '',
-      passwordHash: data.password_hash || '',
-      fullName: data.full_name || '',
-      avatarUrl: data.avatar_url || '',
+      displayName: data.displayName || '',
+      avatar: data.avatar || '',
       age: data.age || null,
       gender: data.gender || '',
       height: data.height || null,
       weight: data.weight || null,
-      fitnessLevel: data.fitness_level || '',
-      goals: data.goals || '',
-      isPremium: data.is_premium === true,
-      createdAt: data.created_at || '',
-      updatedAt: data.updated_at || '',
-      authProvider: data.auth_provider || 'password',
+      fitnessLevel: data.fitnessLevel || '',
+      goals: data.goals || [],
+      preferences: data.preferences || {},
+      createdAt: data.createdAt ? data.createdAt.toDate() : null,
+      updatedAt: data.updatedAt ? data.updatedAt.toDate() : null,
+      authProvider: data.authProvider || 'password',
       role: data.role || 'user'
     });
   }
 
   // Convert User object to Firestore document
   toFirestore() {
-    const now = new Date().toISOString();
     return {
-      user_id: this.userId,
       email: this.email,
-      password_hash: this.passwordHash,
-      full_name: this.fullName,
-      avatar_url: this.avatarUrl,
+      displayName: this.displayName,
+      avatar: this.avatar,
       age: this.age,
       gender: this.gender,
       height: this.height,
       weight: this.weight,
-      fitness_level: this.fitnessLevel,
+      fitnessLevel: this.fitnessLevel,
       goals: this.goals,
-      is_premium: this.isPremium,
-      created_at: this.createdAt || now,
-      updated_at: now,
-      auth_provider: this.authProvider,
+      preferences: this.preferences,
+      createdAt: this.createdAt ? new Date(this.createdAt) : new Date(),
+      updatedAt: new Date(),
+      authProvider: this.authProvider,
       role: this.role
     };
   }
 
   // Check if all required profile fields are present
   hasCompleteProfile() {
-    return this.fullName && 
+    return this.displayName && 
            this.gender && 
            this.age !== null && 
            this.height !== null && 
            this.weight !== null && 
-           this.fitnessLevel && 
-           this.goals;
+           this.fitnessLevel;
   }
   
   // Check if user is admin
@@ -104,7 +97,7 @@ export class User {
   // Create a safe user object with just the essential fields
   static createMinimalUser(userId, email, authProvider = 'password', role = 'user') {
     return new User({
-      userId,
+      id: userId,
       email,
       authProvider,
       role

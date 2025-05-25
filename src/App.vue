@@ -55,23 +55,18 @@ const toggleSidebar = () => {
           </router-link>
         </li>
         <li class="nav-item">
-          <router-link to="/admin/main-categories" class="nav-link">
-            <i class="bi bi-grid me-2"></i> Main Categories
+          <router-link to="/admin/categories" class="nav-link">
+            <i class="bi bi-grid me-2"></i> Categories
           </router-link>
         </li>
         <li class="nav-item">
-          <router-link to="/admin/sub-categories" class="nav-link">
-            <i class="bi bi-grid-3x3-gap me-2"></i> Sub Categories
+          <router-link to="/admin/workout-types" class="nav-link">
+            <i class="bi bi-grid-3x3-gap me-2"></i> Workout Types
           </router-link>
         </li>
         <li class="nav-item">
-          <router-link to="/admin/difficulty-levels" class="nav-link">
-            <i class="bi bi-bar-chart-steps me-2"></i> Difficulty Levels
-          </router-link>
-        </li>
-        <li class="nav-item">
-          <router-link to="/admin/workout-plans" class="nav-link">
-            <i class="bi bi-calendar-check me-2"></i> Workout Plans
+          <router-link to="/admin/levels" class="nav-link">
+            <i class="bi bi-bar-chart-steps me-2"></i> Levels
           </router-link>
         </li>
         <li class="nav-item">
@@ -80,8 +75,13 @@ const toggleSidebar = () => {
           </router-link>
         </li>
         <li class="nav-item">
-          <router-link to="/admin/user-workouts" class="nav-link">
-            <i class="bi bi-clipboard-data me-2"></i> User Workouts
+          <router-link to="/admin/workout-sessions" class="nav-link">
+            <i class="bi bi-stopwatch me-2"></i> Workout Sessions
+          </router-link>
+        </li>
+        <li class="nav-item">
+          <router-link to="/admin/user-progress" class="nav-link">
+            <i class="bi bi-clipboard-data me-2"></i> User Progress
           </router-link>
         </li>
         <li class="nav-item">

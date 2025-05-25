@@ -1,40 +1,52 @@
 /**
  * User Progress Model
- * Matches the Android model: com.example.nammoadidaphat.domain.model.UserProgress
+ * Based on the database schema design
  */
 export class UserProgress {
   constructor({
-    progress_id = '',
-    user_id = '',
-    date = null,
-    weight = 0,
-    body_measurements = {},
-    photos = [],
+    id = '',
+    userId = '',
+    levelId = '',
+    exerciseId = '',
+    completionDate = null,
+    duration = 0,
+    repsCompleted = 0,
+    setsCompleted = 0,
+    caloriesBurned = 0,
+    difficulty = '',
     notes = '',
-    created_at = null
+    createdAt = null
   } = {}) {
-    this.progress_id = progress_id;
-    this.user_id = user_id;
-    this.date = date;
-    this.weight = weight;
-    this.body_measurements = body_measurements;
-    this.photos = photos;
+    this.id = id;
+    this.userId = userId;
+    this.levelId = levelId;
+    this.exerciseId = exerciseId;
+    this.completionDate = completionDate;
+    this.duration = duration;
+    this.repsCompleted = repsCompleted;
+    this.setsCompleted = setsCompleted;
+    this.caloriesBurned = caloriesBurned;
+    this.difficulty = difficulty;
     this.notes = notes;
-    this.created_at = created_at;
+    this.createdAt = createdAt;
   }
 
   // Convert Firestore document to UserProgress object
   static fromFirestore(doc) {
     const data = doc.data();
     return new UserProgress({
-      progress_id: doc.id,
-      user_id: data.user_id || '',
-      date: data.date ? data.date.toDate() : null,
-      weight: data.weight || 0,
-      body_measurements: data.body_measurements || {},
-      photos: data.photos || [],
+      id: doc.id,
+      userId: data.userId || '',
+      levelId: data.levelId || '',
+      exerciseId: data.exerciseId || '',
+      completionDate: data.completionDate ? data.completionDate.toDate() : null,
+      duration: data.duration || 0,
+      repsCompleted: data.repsCompleted || 0,
+      setsCompleted: data.setsCompleted || 0,
+      caloriesBurned: data.caloriesBurned || 0,
+      difficulty: data.difficulty || '',
       notes: data.notes || '',
-      created_at: data.created_at ? data.created_at.toDate() : null
+      createdAt: data.createdAt ? data.createdAt.toDate() : null
     });
   }
 
@@ -42,13 +54,17 @@ export class UserProgress {
   toFirestore() {
     const now = new Date();
     return {
-      user_id: this.user_id,
-      date: this.date ? new Date(this.date) : now,
-      weight: this.weight,
-      body_measurements: this.body_measurements,
-      photos: this.photos,
+      userId: this.userId,
+      levelId: this.levelId,
+      exerciseId: this.exerciseId,
+      completionDate: this.completionDate ? new Date(this.completionDate) : now,
+      duration: this.duration,
+      repsCompleted: this.repsCompleted,
+      setsCompleted: this.setsCompleted,
+      caloriesBurned: this.caloriesBurned,
+      difficulty: this.difficulty,
       notes: this.notes,
-      created_at: this.created_at ? new Date(this.created_at) : now
+      createdAt: this.createdAt ? new Date(this.createdAt) : now
     };
   }
 } 

@@ -1,612 +1,616 @@
 <script>
-import { ref, onMounted, computed } from 'vue';
-import DataTable from '@/components/dashboard/DataTable.vue';
-import StatCard from '@/components/dashboard/StatCard.vue';
-import ImageUploader from '@/components/dashboard/ImageUploader.vue';
-import { db } from '@/firebase/config';
-import { 
-  collection, getDocs, doc, addDoc, updateDoc, deleteDoc, 
-  query, orderBy, where, writeBatch, getDoc
-} from 'firebase/firestore';
-import { Exercise } from '@/models/Exercise';
-import { Modal } from 'bootstrap';
+import { ref, onMounted } from 'vue';
+import { getAllExercises, getExercisesByLevel, getExercisesByMuscleGroup, createExercise, updateExercise, deleteExercise, toggleExerciseActive } from '@/firebase/exerciseManager';
+import { getAllLevels } from '@/firebase/levelManager';
+import { Exercise } from '@/models';
 
 export default {
-  components: {
-    DataTable,
-    StatCard,
-    ImageUploader
-  },
+  name: 'AdminExercises',
   setup() {
-// State
-const exercises = ref([]);
-const loading = ref(true);
+    const exercises = ref([]);
+    const levels = ref([]);
+    const loading = ref(true);
+    const error = ref(null);
+    const showForm = ref(false);
+    const editMode = ref(false);
     const currentExercise = ref(new Exercise({}));
-    const isEditing = ref(false);
-    const targetMuscleOptions = ref([
-      'Chest', 'Back', 'Shoulders', 'Biceps', 'Triceps', 
-      'Abs', 'Legs', 'Calves', 'Glutes', 'Cardio', 'Full Body'
-    ]);
-    const equipmentOptions = ref([
-      'None', 'Dumbbells', 'Barbell', 'Kettlebell', 'Resistance Bands', 
-      'Pull-up Bar', 'Bench', 'Swiss Ball', 'Yoga Mat'
-    ]);
-    const searchTerm = ref('');
-    const selectedMuscleFilter = ref('');
-
-    // Modal refs
-    const exerciseModal = ref(null);
-    const deleteModal = ref(null);
-
-    // Computed
-    const filteredExercises = computed(() => {
-      return exercises.value.filter(exercise => {
-        const matchesSearch = searchTerm.value === '' || 
-                             exercise.name.toLowerCase().includes(searchTerm.value.toLowerCase()) ||
-                             exercise.name_en.toLowerCase().includes(searchTerm.value.toLowerCase());
-                             
-        const matchesMuscle = selectedMuscleFilter.value === '' || 
-                             (exercise.target_muscles && 
-                              exercise.target_muscles.includes(selectedMuscleFilter.value));
-                              
-        return matchesSearch && matchesMuscle;
-      });
+    const filter = ref({
+      levelId: '',
+      muscleGroup: ''
     });
-
-    const columns = [
-      { key: 'thumbnail_url', label: 'Image' },
-      { key: 'name', label: 'Name' },
-      { key: 'target_muscles', label: 'Target Muscles' },
-      { key: 'equipment_needed', label: 'Equipment' },
-      { key: 'calories_per_minute', label: 'Calories/Min' },
-      { key: 'is_reps_based', label: 'Type' }
+    
+    // Predefined muscle groups
+    const muscleGroups = [
+      'Chest',
+      'Back',
+      'Shoulders',
+      'Arms',
+      'Abdominals',
+      'Legs',
+      'Full Body',
+      'Core'
     ];
 
-    const stats = computed(() => [
-      {
-        title: 'Total Exercises',
-        value: exercises.value.length,
-        icon: 'fa-dumbbell',
-        color: 'primary'
-      },
-      {
-        title: 'No Equipment',
-        value: exercises.value.filter(ex => 
-          !ex.equipment_needed || 
-          ex.equipment_needed.length === 0 || 
-          (ex.equipment_needed.length === 1 && ex.equipment_needed[0] === 'None')
-        ).length,
-        icon: 'fa-running',
-        color: 'success'
-      },
-      {
-        title: 'Time Based',
-        value: exercises.value.filter(ex => ex.is_time_default).length,
-        icon: 'fa-stopwatch',
-        color: 'info'
-      },
-      {
-        title: 'Reps Based',
-        value: exercises.value.filter(ex => ex.is_reps_based).length,
-        icon: 'fa-list-ol',
-        color: 'warning'
-      }
-    ]);
+    // Form validation
+    const formErrors = ref({});
 
-    // Fetch exercises from Firestore
-const fetchExercises = async () => {
+    // Fetch all exercises
+    const fetchExercises = async () => {
+      loading.value = true;
+      error.value = null;
       try {
-  loading.value = true;
-        const exerciseCollection = collection(db, 'exercises');
-        const exerciseQuery = query(exerciseCollection, orderBy('name'));
-        const querySnapshot = await getDocs(exerciseQuery);
-        
-        const exerciseList = [];
-        querySnapshot.forEach((doc) => {
-          exerciseList.push(Exercise.fromFirestore(doc));
-        });
-        
-        exercises.value = exerciseList;
-      } catch (error) {
-        console.error('Error fetching exercises:', error);
-  } finally {
-    loading.value = false;
-  }
-};
-
-    // Open modal for creating/editing
-    const openExerciseModal = (exercise = null) => {
-      if (exercise) {
-        currentExercise.value = { ...exercise };
-        isEditing.value = true;
-      } else {
-        currentExercise.value = new Exercise({});
-        isEditing.value = false;
-      }
-      
-      const modalElement = document.getElementById('exerciseModal');
-      if (modalElement) {
-        exerciseModal.value = new Modal(modalElement);
-        exerciseModal.value.show();
-      }
-    };
-
-    // Open delete confirmation modal
-    const openDeleteModal = (exercise) => {
-      currentExercise.value = { ...exercise };
-      
-      const modalElement = document.getElementById('deleteModal');
-      if (modalElement) {
-        deleteModal.value = new Modal(modalElement);
-        deleteModal.value.show();
-      }
-    };
-
-    // Save exercise to Firestore
-    const saveExercise = async () => {
-      try {
-        if (!currentExercise.value.name) {
-          alert('Exercise name is required');
-          return;
-        }
-
-        if (!currentExercise.value.thumbnail_url) {
-          alert('Exercise image is required');
-          return;
-        }
-
-        if (isEditing.value) {
-          // Update existing exercise
-          const exerciseDoc = doc(db, 'exercises', currentExercise.value.exercise_id);
-          await updateDoc(exerciseDoc, currentExercise.value.toFirestore());
+        if (filter.value.levelId) {
+          exercises.value = await getExercisesByLevel(filter.value.levelId);
+        } else if (filter.value.muscleGroup) {
+          exercises.value = await getExercisesByMuscleGroup(filter.value.muscleGroup);
         } else {
-          // Create new exercise
-          await addDoc(collection(db, 'exercises'), currentExercise.value.toFirestore());
+          exercises.value = await getAllExercises();
         }
-
-        // Refresh exercises list
-        await fetchExercises();
-        
-        // Close modal
-        if (exerciseModal.value) {
-          exerciseModal.value.hide();
-        }
-      } catch (error) {
-        console.error('Error saving exercise:', error);
-        alert(`Error saving exercise: ${error.message}`);
+      } catch (err) {
+        console.error('Error fetching exercises:', err);
+        error.value = 'Failed to load exercises. Please try again.';
+      } finally {
+        loading.value = false;
       }
     };
 
-    // Delete exercise from Firestore
-    const deleteExercise = async () => {
+    // Fetch all levels
+    const fetchLevels = async () => {
       try {
-        if (!currentExercise.value.exercise_id) {
-          return;
-        }
-
-        // First check if exercise is used in any workout plan
-        const planExercisesRef = collection(db, 'plan_exercises');
-        const q = query(planExercisesRef, where('exercise_id', '==', currentExercise.value.exercise_id));
-        const querySnapshot = await getDocs(q);
-        
-        if (!querySnapshot.empty) {
-          alert(`Cannot delete this exercise because it's used in ${querySnapshot.size} workout plans.`);
-          return;
-        }
-
-        // Delete the exercise
-        await deleteDoc(doc(db, 'exercises', currentExercise.value.exercise_id));
-        
-        // Refresh exercises list
-        await fetchExercises();
-        
-        // Close modal
-        if (deleteModal.value) {
-          deleteModal.value.hide();
-        }
-      } catch (error) {
-        console.error('Error deleting exercise:', error);
-        alert(`Error deleting exercise: ${error.message}`);
+        levels.value = await getAllLevels(true); // Only active levels
+      } catch (err) {
+        console.error('Error fetching levels:', err);
+        error.value = 'Failed to load levels. Please try again.';
       }
     };
 
-    // Handle image upload success
-    const handleImageUpload = (imageData) => {
-      currentExercise.value.thumbnail_url = imageData.url;
-    };
-
-    // Toggle a value in array
-    const toggleArrayValue = (array, value) => {
-      const index = array.indexOf(value);
-      if (index === -1) {
-        array.push(value);
-      } else {
-        array.splice(index, 1);
-      }
-    };
-
-    // Initialize
-    onMounted(() => {
-      fetchExercises();
+    // Initialize component
+    onMounted(async () => {
+      await fetchLevels();
+      await fetchExercises();
     });
+
+    // Filter exercises
+    const applyFilter = () => {
+      fetchExercises();
+    };
+
+    // Reset filter
+    const resetFilter = () => {
+      filter.value = {
+        levelId: '',
+        muscleGroup: ''
+      };
+      fetchExercises();
+    };
+
+    // Add new exercise
+    const addExercise = () => {
+      currentExercise.value = new Exercise({
+        levelId: filter.value.levelId || '',
+        instructions: [],
+        tips: [],
+        muscleGroups: []
+      });
+      showForm.value = true;
+      editMode.value = false;
+    };
+
+    // Edit exercise
+    const editExercise = (exercise) => {
+      currentExercise.value = new Exercise({ ...exercise });
+      showForm.value = true;
+      editMode.value = true;
+    };
+
+    // Handle array inputs for instructions, tips, and muscle groups
+    const addArrayItem = (array, item) => {
+      if (item.trim()) {
+        array.push(item.trim());
+        return '';
+      }
+      return item;
+    };
+
+    const removeArrayItem = (array, index) => {
+      array.splice(index, 1);
+    };
+
+    // Toggle muscle group selection
+    const toggleMuscleGroup = (group) => {
+      const index = currentExercise.value.muscleGroups.indexOf(group);
+      if (index === -1) {
+        currentExercise.value.muscleGroups.push(group);
+      } else {
+        currentExercise.value.muscleGroups.splice(index, 1);
+      }
+    };
+
+    // Validate form
+    const validateForm = () => {
+      const errors = {};
+      
+      if (!currentExercise.value.name.trim()) {
+        errors.name = 'Name is required';
+      }
+      
+      if (!currentExercise.value.levelId) {
+        errors.levelId = 'Level is required';
+      }
+      
+      formErrors.value = errors;
+      return Object.keys(errors).length === 0;
+    };
+
+    // Save exercise
+    const saveExercise = async () => {
+      if (!validateForm()) return;
+      
+      loading.value = true;
+      error.value = null;
+      
+      try {
+        if (editMode.value) {
+          await updateExercise(currentExercise.value.id, currentExercise.value);
+        } else {
+          const exerciseId = await createExercise(currentExercise.value);
+          currentExercise.value.id = exerciseId;
+        }
+        
+        await fetchExercises();
+        showForm.value = false;
+      } catch (err) {
+        console.error('Error saving exercise:', err);
+        error.value = `Failed to ${editMode.value ? 'update' : 'create'} exercise. Please try again.`;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Cancel form
+    const cancelForm = () => {
+      showForm.value = false;
+      formErrors.value = {};
+    };
+
+    // Toggle exercise active state
+    const toggleActive = async (exercise) => {
+      loading.value = true;
+      error.value = null;
+      
+      try {
+        await toggleExerciseActive(exercise.id, !exercise.isActive);
+        await fetchExercises();
+      } catch (err) {
+        console.error('Error toggling exercise active state:', err);
+        error.value = 'Failed to update exercise status. Please try again.';
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Delete exercise
+    const confirmDelete = async (exercise) => {
+      if (!confirm(`Are you sure you want to delete "${exercise.name}"?`)) return;
+      
+      loading.value = true;
+      error.value = null;
+      
+      try {
+        await deleteExercise(exercise.id);
+        await fetchExercises();
+      } catch (err) {
+        console.error('Error deleting exercise:', err);
+        error.value = 'Failed to delete exercise. Please try again.';
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Get level name by ID
+    const getLevelName = (levelId) => {
+      const level = levels.value.find(l => l.id === levelId);
+      return level ? level.name : 'Unknown';
+    };
 
     return {
       exercises,
-      filteredExercises,
+      levels,
       loading,
-      columns,
-      stats,
+      error,
+      showForm,
+      editMode,
       currentExercise,
-      isEditing,
-      targetMuscleOptions,
-      equipmentOptions,
-      searchTerm,
-      selectedMuscleFilter,
-      openExerciseModal,
-      openDeleteModal,
+      filter,
+      muscleGroups,
+      formErrors,
+      fetchExercises,
+      addExercise,
+      editExercise,
       saveExercise,
-      deleteExercise,
-      handleImageUpload,
-      toggleArrayValue
+      cancelForm,
+      toggleActive,
+      confirmDelete,
+      getLevelName,
+      applyFilter,
+      resetFilter,
+      addArrayItem,
+      removeArrayItem,
+      toggleMuscleGroup
     };
   }
 };
 </script>
 
 <template>
-  <div class="content-container">
-    <h1 class="page-title">Exercise Management</h1>
-    
-    <!-- Stats Row -->
-    <div class="row">
-      <div class="col-md-6 col-xl-3" v-for="(stat, index) in stats" :key="index">
-        <StatCard
-          :title="stat.title"
-          :value="stat.value"
-          :icon="stat.icon"
-          :color="stat.color"
-        />
-      </div>
-    </div>
-    
-    <!-- Filters and Add Button -->
-    <div class="row mb-4">
-      <div class="col-md-4">
-        <div class="input-group">
-          <span class="input-group-text"><i class="fa fa-search"></i></span>
-          <input 
-            type="text" 
-            class="form-control" 
-            placeholder="Search exercises..." 
-            v-model="searchTerm"
-          />
-        </div>
-      </div>
-      <div class="col-md-3">
-        <select class="form-select" v-model="selectedMuscleFilter">
-          <option value="">All Target Muscles</option>
-          <option v-for="muscle in targetMuscleOptions" :key="muscle" :value="muscle">
-            {{ muscle }}
-          </option>
-        </select>
-      </div>
-      <div class="col-md-5 text-end">
-        <button class="btn btn-primary" @click="openExerciseModal()">
-          <i class="fa fa-plus"></i> Add Exercise
+  <div class="exercises-container">
+    <div class="d-flex justify-content-between align-items-center mb-4">
+      <h1>Exercises</h1>
+      <button class="btn btn-primary" @click="addExercise">
+        <i class="fas fa-plus me-2"></i> Add Exercise
       </button>
+    </div>
+
+    <div v-if="error" class="alert alert-danger">{{ error }}</div>
+    
+    <!-- Filters -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5>Filters</h5>
+      </div>
+      <div class="card-body">
+        <div class="row align-items-end">
+          <div class="col-md-4 mb-3">
+            <label for="levelFilter" class="form-label">Filter by Level</label>
+            <select 
+              id="levelFilter" 
+              class="form-select" 
+              v-model="filter.levelId"
+            >
+              <option value="">All Levels</option>
+              <option v-for="level in levels" :key="level.id" :value="level.id">
+                {{ level.name }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-4 mb-3">
+            <label for="muscleGroupFilter" class="form-label">Filter by Muscle Group</label>
+            <select 
+              id="muscleGroupFilter" 
+              class="form-select" 
+              v-model="filter.muscleGroup"
+            >
+              <option value="">All Muscle Groups</option>
+              <option v-for="group in muscleGroups" :key="group" :value="group">
+                {{ group }}
+              </option>
+            </select>
+          </div>
+          
+          <div class="col-md-4 mb-3 d-flex gap-2">
+            <button class="btn btn-primary" @click="applyFilter" :disabled="loading">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Apply Filter
+            </button>
+            <button class="btn btn-secondary" @click="resetFilter">Reset</button>
+          </div>
+        </div>
       </div>
     </div>
     
-    <!-- Exercises Table -->
-    <DataTable
-      title="Exercises"
-      :columns="columns"
-      :items="filteredExercises"
-      :loading="loading"
-    >
-      <template #thumbnail_url="{ value }">
-        <div class="exercise-thumbnail">
-          <img :src="value || 'https://via.placeholder.com/50'" alt="Exercise" />
-        </div>
-      </template>
-      
-      <template #target_muscles="{ value }">
-        <div class="d-flex flex-wrap gap-1">
-          <span 
-            v-for="muscle in value" 
-            :key="muscle" 
-            class="badge bg-info"
-          >
-            {{ muscle }}
-          </span>
-          <span v-if="!value || value.length === 0">-</span>
-        </div>
-      </template>
-      
-      <template #equipment_needed="{ value }">
-        <div class="d-flex flex-wrap gap-1">
-          <span 
-            v-for="equipment in value" 
-            :key="equipment" 
-            class="badge bg-secondary"
-          >
-            {{ equipment }}
-          </span>
-          <span v-if="!value || value.length === 0">None</span>
-        </div>
-      </template>
-      
-      <template #is_reps_based="{ value, item }">
-        <span v-if="item.is_time_default" class="badge bg-warning">Time</span>
-        <span v-else-if="value" class="badge bg-success">Reps</span>
-        <span v-else class="badge bg-secondary">Other</span>
-      </template>
-      
-      <template #actions="{ item }">
-        <div class="btn-group">
-          <button 
-            class="btn btn-sm btn-primary" 
-            @click="openExerciseModal(item)" 
-            title="Edit"
-          >
-            <i class="fa fa-edit"></i>
-          </button>
-          <button 
-            class="btn btn-sm btn-danger" 
-            @click="openDeleteModal(item)" 
-            title="Delete"
-          >
-            <i class="fa fa-trash"></i>
-          </button>
-        </div>
-      </template>
-    </DataTable>
-    
-    <!-- Exercise Modal -->
-    <div class="modal fade" id="exerciseModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog modal-lg">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">{{ isEditing ? 'Edit Exercise' : 'Add Exercise' }}</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-          </div>
-          <div class="modal-body">
-            <form @submit.prevent="saveExercise">
-              <div class="row mb-3">
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Exercise Name (Vietnamese) *</label>
-                    <input 
-                      type="text" 
-                      class="form-control" 
-                      v-model="currentExercise.name" 
-                      required
-                    />
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Exercise Name (English)</label>
-                    <input 
-                      type="text" 
-                      class="form-control" 
-                      v-model="currentExercise.name_en"
-                    />
-                  </div>
+    <!-- Exercise Form -->
+    <div v-if="showForm" class="card mb-4">
+      <div class="card-header">
+        <h5>{{ editMode ? 'Edit Exercise' : 'Add New Exercise' }}</h5>
+      </div>
+      <div class="card-body">
+        <form @submit.prevent="saveExercise">
+          <div class="row">
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="levelId" class="form-label">Level*</label>
+                <select
+                  id="levelId"
+                  class="form-select"
+                  v-model="currentExercise.levelId"
+                  :class="{ 'is-invalid': formErrors.levelId }"
+                >
+                  <option value="">Select Level</option>
+                  <option v-for="level in levels" :key="level.id" :value="level.id">
+                    {{ level.name }}
+                  </option>
+                </select>
+                <div v-if="formErrors.levelId" class="invalid-feedback">
+                  {{ formErrors.levelId }}
                 </div>
               </div>
               
               <div class="mb-3">
-                <label class="form-label">Description</label>
-                <textarea 
-                  class="form-control" 
-                  v-model="currentExercise.description" 
+                <label for="name" class="form-label">Name*</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="name"
+                  v-model="currentExercise.name"
+                  :class="{ 'is-invalid': formErrors.name }"
+                >
+                <div v-if="formErrors.name" class="invalid-feedback">
+                  {{ formErrors.name }}
+                </div>
+              </div>
+              
+              <div class="mb-3">
+                <label for="description" class="form-label">Description</label>
+                <textarea
+                  class="form-control"
+                  id="description"
+                  v-model="currentExercise.description"
                   rows="3"
                 ></textarea>
               </div>
               
-              <div class="row mb-3">
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Image *</label>
-                    <ImageUploader
-                      v-model:value="currentExercise.thumbnail_url"
-                      folder="exercises"
-                      @upload-success="handleImageUpload"
-                    />
-                  </div>
-                </div>
-                <div class="col-md-6">
-                  <div class="mb-3">
-                    <label class="form-label">Video URL</label>
-                    <input 
-                      type="url" 
-                      class="form-control" 
-                      v-model="currentExercise.video_url"
-                      placeholder="https://example.com/video.mp4"
-                    />
-                  </div>
-                  <div class="mb-3">
-                    <label class="form-label">GIF URL</label>
-                    <input 
-                      type="url" 
-                      class="form-control" 
-                      v-model="currentExercise.gif_url"
-                      placeholder="https://example.com/animation.gif"
-                    />
-                  </div>
-                </div>
+              <div class="mb-3">
+                <label for="image" class="form-label">Image URL</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="image"
+                  v-model="currentExercise.image"
+                >
               </div>
               
-              <div class="row mb-3">
-                <div class="col-md-4">
-                  <div class="mb-3">
-                    <label class="form-label">Calories per Minute</label>
-                    <input 
-                      type="number" 
-                      class="form-control" 
-                      v-model="currentExercise.calories_per_minute"
-                      min="0" 
-                      step="0.1"
-                    />
-                  </div>
-                </div>
-                <div class="col-md-4">
-                  <div class="form-check mt-4">
-                    <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      id="isTimeDefault" 
-                      v-model="currentExercise.is_time_default"
-                    />
-                    <label class="form-check-label" for="isTimeDefault">
-                      Time Based Exercise
-                    </label>
-                  </div>
-                </div>
-                <div class="col-md-4">
-                  <div class="form-check mt-4">
-                    <input 
-                      class="form-check-input" 
-                      type="checkbox" 
-                      id="isRepsBased" 
-                      v-model="currentExercise.is_reps_based"
-                    />
-                    <label class="form-check-label" for="isRepsBased">
-                      Reps Based Exercise
-                    </label>
-                  </div>
-                </div>
+              <div class="mb-3">
+                <label for="video" class="form-label">Video URL</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="video"
+                  v-model="currentExercise.video"
+                >
+              </div>
+            </div>
+            
+            <div class="col-md-6">
+              <div class="mb-3">
+                <label for="equipment" class="form-label">Equipment</label>
+                <input
+                  type="text"
+                  class="form-control"
+                  id="equipment"
+                  v-model="currentExercise.equipment"
+                >
               </div>
               
-              <div class="row mb-3">
-                <div class="col-md-6">
-                  <label class="form-label">Target Muscles</label>
-                  <div class="target-muscle-options">
-                    <div 
-                      v-for="muscle in targetMuscleOptions" 
-                      :key="muscle" 
-                      class="form-check"
+              <div class="row">
+                <div class="col-md-4">
+                  <div class="mb-3">
+                    <label for="duration" class="form-label">Duration (sec)</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="duration"
+                      v-model="currentExercise.duration"
+                      min="0"
                     >
-                      <input 
-                        :id="`muscle-${muscle}`" 
-                        type="checkbox" 
-                        class="form-check-input" 
-                        :checked="currentExercise.target_muscles?.includes(muscle)" 
-                        @change="toggleArrayValue(currentExercise.target_muscles = currentExercise.target_muscles || [], muscle)"
-                      />
-                      <label :for="`muscle-${muscle}`" class="form-check-label">{{ muscle }}</label>
-                    </div>
                   </div>
                 </div>
                 
-                <div class="col-md-6">
-                  <label class="form-label">Equipment Needed</label>
-                  <div class="equipment-options">
-                    <div 
-                      v-for="equipment in equipmentOptions" 
-                      :key="equipment" 
-                      class="form-check"
+                <div class="col-md-4">
+                  <div class="mb-3">
+                    <label for="reps" class="form-label">Reps</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="reps"
+                      v-model="currentExercise.reps"
+                      min="0"
                     >
-                      <input 
-                        :id="`equipment-${equipment}`" 
-                        type="checkbox" 
-                        class="form-check-input" 
-                        :checked="currentExercise.equipment_needed?.includes(equipment)" 
-                        @change="toggleArrayValue(currentExercise.equipment_needed = currentExercise.equipment_needed || [], equipment)"
-                      />
-                      <label :for="`equipment-${equipment}`" class="form-check-label">{{ equipment }}</label>
-                    </div>
+                  </div>
+                </div>
+                
+                <div class="col-md-4">
+                  <div class="mb-3">
+                    <label for="restTime" class="form-label">Rest Time (sec)</label>
+                    <input
+                      type="number"
+                      class="form-control"
+                      id="restTime"
+                      v-model="currentExercise.restTime"
+                      min="0"
+                    >
                   </div>
                 </div>
               </div>
               
               <div class="mb-3">
-                <label class="form-label">Instructions</label>
-                <div v-for="(instruction, index) in (currentExercise.instructions || [])" :key="index" class="input-group mb-2">
-                  <input 
-                    type="text" 
-                    class="form-control" 
-                    v-model="currentExercise.instructions[index]"
-                  />
-                  <button 
-                    type="button" 
-                    class="btn btn-outline-danger" 
-                    @click="currentExercise.instructions.splice(index, 1)"
-                  >
-                    <i class="fa fa-times"></i>
-                  </button>
-                </div>
-                <button 
-                  type="button" 
-                  class="btn btn-outline-secondary btn-sm"
-                  @click="currentExercise.instructions = currentExercise.instructions || []; currentExercise.instructions.push('')"
+                <label for="caloriesBurn" class="form-label">Calories Burn</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="caloriesBurn"
+                  v-model="currentExercise.caloriesBurn"
+                  min="0"
                 >
-                  <i class="fa fa-plus"></i> Add Instruction
-                </button>
               </div>
-            </form>
+              
+              <div class="mb-3">
+                <label for="order" class="form-label">Order</label>
+                <input
+                  type="number"
+                  class="form-control"
+                  id="order"
+                  v-model="currentExercise.order"
+                  min="0"
+                >
+              </div>
+              
+              <div class="mb-3 form-check">
+                <input
+                  type="checkbox"
+                  class="form-check-input"
+                  id="isActive"
+                  v-model="currentExercise.isActive"
+                >
+                <label class="form-check-label" for="isActive">Active</label>
+              </div>
+            </div>
           </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-primary" @click="saveExercise">Save</button>
+          
+          <!-- Muscle Groups -->
+          <div class="mb-3">
+            <label class="form-label">Muscle Groups</label>
+            <div>
+              <div class="form-check form-check-inline" v-for="group in muscleGroups" :key="group">
+                <input 
+                  class="form-check-input" 
+                  type="checkbox" 
+                  :id="'muscle-' + group" 
+                  :checked="currentExercise.muscleGroups.includes(group)"
+                  @change="toggleMuscleGroup(group)"
+                >
+                <label class="form-check-label" :for="'muscle-' + group">{{ group }}</label>
+              </div>
+            </div>
           </div>
-        </div>
+          
+          <!-- Instructions -->
+          <div class="mb-3">
+            <label class="form-label">Instructions</label>
+            <div v-for="(instruction, index) in currentExercise.instructions" :key="index" class="input-group mb-2">
+              <input type="text" class="form-control" v-model="currentExercise.instructions[index]">
+              <button type="button" class="btn btn-outline-danger" @click="removeArrayItem(currentExercise.instructions, index)">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="input-group">
+              <input 
+                type="text" 
+                class="form-control" 
+                placeholder="Add instruction and press Enter" 
+                v-model="newInstruction"
+                @keyup.enter="newInstruction = addArrayItem(currentExercise.instructions, newInstruction)"
+              >
+              <button 
+                type="button" 
+                class="btn btn-outline-success" 
+                @click="newInstruction = addArrayItem(currentExercise.instructions, newInstruction)"
+              >
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+          </div>
+          
+          <!-- Tips -->
+          <div class="mb-3">
+            <label class="form-label">Tips</label>
+            <div v-for="(tip, index) in currentExercise.tips" :key="index" class="input-group mb-2">
+              <input type="text" class="form-control" v-model="currentExercise.tips[index]">
+              <button type="button" class="btn btn-outline-danger" @click="removeArrayItem(currentExercise.tips, index)">
+                <i class="fas fa-times"></i>
+              </button>
+            </div>
+            <div class="input-group">
+              <input 
+                type="text" 
+                class="form-control" 
+                placeholder="Add tip and press Enter" 
+                v-model="newTip"
+                @keyup.enter="newTip = addArrayItem(currentExercise.tips, newTip)"
+              >
+              <button 
+                type="button" 
+                class="btn btn-outline-success" 
+                @click="newTip = addArrayItem(currentExercise.tips, newTip)"
+              >
+                <i class="fas fa-plus"></i>
+              </button>
+            </div>
+          </div>
+          
+          <div class="d-flex gap-2">
+            <button type="submit" class="btn btn-primary" :disabled="loading">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              {{ editMode ? 'Update' : 'Create' }}
+            </button>
+            <button type="button" class="btn btn-secondary" @click="cancelForm">Cancel</button>
+          </div>
+        </form>
       </div>
     </div>
     
-    <!-- Delete Confirmation Modal -->
-    <div class="modal fade" id="deleteModal" tabindex="-1" aria-hidden="true">
-      <div class="modal-dialog">
-        <div class="modal-content">
-          <div class="modal-header">
-            <h5 class="modal-title">Delete Exercise</h5>
-            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+    <!-- Exercises Table -->
+    <div class="card">
+      <div class="card-body">
+        <div v-if="loading && !showForm" class="text-center my-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
           </div>
-          <div class="modal-body">
-            <p>Are you sure you want to delete the exercise <strong>{{ currentExercise.name }}</strong>?</p>
-            <p class="text-danger">This action cannot be undone.</p>
-          </div>
-          <div class="modal-footer">
-            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Cancel</button>
-            <button type="button" class="btn btn-danger" @click="deleteExercise">Delete</button>
         </div>
+        
+        <div v-else-if="exercises.length === 0" class="alert alert-info">
+          No exercises found. Click "Add Exercise" to create one.
         </div>
+        
+        <table v-else class="table table-striped table-hover">
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Level</th>
+              <th>Muscle Groups</th>
+              <th>Duration/Reps</th>
+              <th>Order</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr v-for="exercise in exercises" :key="exercise.id">
+              <td>
+                <div class="d-flex align-items-center">
+                  <img v-if="exercise.image" :src="exercise.image" alt="Image" class="me-2" style="width: 40px; height: 40px; object-fit: cover; border-radius: 4px;">
+                  {{ exercise.name }}
+                </div>
+              </td>
+              <td>{{ getLevelName(exercise.levelId) }}</td>
+              <td>
+                <span v-for="group in exercise.muscleGroups" :key="group" class="badge bg-info me-1">
+                  {{ group }}
+                </span>
+              </td>
+              <td>
+                <span v-if="exercise.duration">{{ exercise.duration }}s</span>
+                <span v-if="exercise.reps">{{ exercise.reps }} reps</span>
+              </td>
+              <td>{{ exercise.order }}</td>
+              <td>
+                <span :class="`badge ${exercise.isActive ? 'bg-success' : 'bg-danger'}`">
+                  {{ exercise.isActive ? 'Active' : 'Inactive' }}
+                </span>
+              </td>
+              <td>
+                <div class="btn-group">
+                  <button class="btn btn-sm btn-outline-primary" @click="editExercise(exercise)">
+                    <i class="fas fa-edit"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-warning" @click="toggleActive(exercise)">
+                    <i :class="`fas fa-${exercise.isActive ? 'ban' : 'check'}`"></i>
+                  </button>
+                  <button class="btn btn-sm btn-outline-danger" @click="confirmDelete(exercise)">
+                    <i class="fas fa-trash"></i>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </tbody>
+        </table>
       </div>
     </div>
   </div>
-</template> 
+</template>
 
 <style scoped>
-.content-container {
+.exercises-container {
   padding: 20px;
-}
-
-.page-title {
-  margin-bottom: 20px;
-  font-size: 24px;
-  font-weight: 600;
-}
-
-.exercise-thumbnail {
-  width: 50px;
-  height: 50px;
-  overflow: hidden;
-  border-radius: 4px;
-}
-
-.exercise-thumbnail img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-
-.target-muscle-options,
-.equipment-options {
-  max-height: 200px;
-  overflow-y: auto;
-  padding: 10px;
-  border: 1px solid #ced4da;
-  border-radius: 4px;
 }
 </style> 

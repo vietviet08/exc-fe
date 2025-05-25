@@ -1,108 +1,200 @@
-<script setup>
+<script>
 import { ref, onMounted } from 'vue';
-import { collection, getDocs, updateDoc, doc } from 'firebase/firestore';
-import { db } from '../../firebase/config';
+import { getAllUsers, getUsersByRole, getUserById, updateUser } from '@/firebase/userManager';
+import { User } from '@/models';
 
-const users = ref([]);
-const loading = ref(true);
-const error = ref('');
-const success = ref('');
-const actionInProgress = ref(false);
-
-// Load all users from Firestore
-const loadUsers = async () => {
-  loading.value = true;
-  error.value = '';
-  
-  try {
-    console.log('Loading users from Firestore');
-    const usersCollection = collection(db, 'users');
-    const querySnapshot = await getDocs(usersCollection);
-    
-    const usersList = [];
-    querySnapshot.forEach(doc => {
-      usersList.push({
-        id: doc.id,
-        ...doc.data(),
-        // Add processing flags for each user
-        isProcessing: false
-      });
+export default {
+  name: 'AdminUsers',
+  setup() {
+    const users = ref([]);
+    const loading = ref(true);
+    const error = ref('');
+    const success = ref('');
+    const filter = ref({
+      role: '',
+      limit: 100
     });
-    
-    users.value = usersList;
-    console.log(`Loaded ${usersList.length} users`);
-  } catch (err) {
-    console.error('Error loading users:', err);
-    error.value = `Error loading users: ${err.message}`;
-  } finally {
-    loading.value = false;
+    const selectedUser = ref(null);
+    const showDetailsModal = ref(false);
+
+    // Load users from Firebase
+    const fetchUsers = async () => {
+      loading.value = true;
+      error.value = '';
+      
+      try {
+        if (filter.value.role) {
+          users.value = await getUsersByRole(filter.value.role);
+        } else {
+          users.value = await getAllUsers(filter.value.limit);
+        }
+      } catch (err) {
+        console.error('Error loading users:', err);
+        error.value = `Error loading users: ${err.message}`;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Get user details
+    const viewUserDetails = async (userId) => {
+      loading.value = true;
+      error.value = '';
+      
+      try {
+        selectedUser.value = await getUserById(userId);
+        showDetailsModal.value = true;
+      } catch (err) {
+        console.error(`Error fetching user ${userId}:`, err);
+        error.value = `Error fetching user details: ${err.message}`;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Change user role
+    const changeUserRole = async (userId, newRole) => {
+      if (!confirm(`Are you sure you want to change this user's role to ${newRole}?`)) return;
+      
+      loading.value = true;
+      error.value = '';
+      success.value = '';
+      
+      try {
+        const user = await getUserById(userId);
+        if (user) {
+          user.role = newRole;
+          await updateUser(userId, user);
+          success.value = `User role updated successfully for ${user.email}`;
+          await fetchUsers();
+        }
+      } catch (err) {
+        console.error(`Error updating user role for ${userId}:`, err);
+        error.value = `Error updating user role: ${err.message}`;
+      } finally {
+        loading.value = false;
+      }
+    };
+
+    // Format date
+    const formatDate = (date) => {
+      if (!date) return 'N/A';
+      return new Date(date).toLocaleString();
+    };
+
+    // Apply filters
+    const applyFilters = () => {
+      fetchUsers();
+    };
+
+    // Reset filters
+    const resetFilters = () => {
+      filter.value = {
+        role: '',
+        limit: 100
+      };
+      fetchUsers();
+    };
+
+    // Initialize component
+    onMounted(fetchUsers);
+
+    return {
+      users,
+      loading,
+      error,
+      success,
+      filter,
+      selectedUser,
+      showDetailsModal,
+      fetchUsers,
+      viewUserDetails,
+      changeUserRole,
+      formatDate,
+      applyFilters,
+      resetFilters
+    };
   }
 };
-
-// Change user role
-const changeUserRole = async (userId, newRole) => {
-  // Find the user and mark as processing
-  const user = users.value.find(u => u.id === userId);
-  if (!user) return;
-  
-  user.isProcessing = true;
-  actionInProgress.value = true;
-  error.value = '';
-  success.value = '';
-  
-  try {
-    console.log(`Changing role for user ${userId} to ${newRole}`);
-    const userDocRef = doc(db, 'users', userId);
-    await updateDoc(userDocRef, { role: newRole });
-    
-    // Update local user data
-    user.role = newRole;
-    success.value = `User role updated successfully for ${user.email}`;
-    console.log(`Role updated successfully for user ${userId}`);
-  } catch (err) {
-    console.error(`Error updating user role for ${userId}:`, err);
-    error.value = `Error updating user role: ${err.message}`;
-  } finally {
-    user.isProcessing = false;
-    actionInProgress.value = false;
-  }
-};
-
-// Load users when component mounts
-onMounted(() => {
-  loadUsers();
-});
 </script>
 
 <template>
-  <div class="users-container p-4">
+  <div class="users-container">
     <div class="d-flex justify-content-between align-items-center mb-4">
-      <h2>User Management</h2>
+      <h1>Users</h1>
       <button 
         class="btn btn-primary" 
-        @click="loadUsers" 
-        :disabled="loading || actionInProgress"
+        @click="fetchUsers" 
+        :disabled="loading"
       >
-        <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status"></span>
-        Refresh Users
+        <i class="fas fa-sync-alt me-2"></i> Refresh
       </button>
     </div>
-    
+
     <div v-if="error" class="alert alert-danger">{{ error }}</div>
     <div v-if="success" class="alert alert-success">{{ success }}</div>
     
-    <div v-if="loading" class="d-flex justify-content-center">
-      <div class="spinner-border text-primary" role="status">
-        <span class="visually-hidden">Loading...</span>
+    <!-- Filters -->
+    <div class="card mb-4">
+      <div class="card-header">
+        <h5>Filters</h5>
+      </div>
+      <div class="card-body">
+        <div class="row align-items-end">
+          <div class="col-md-4">
+            <label for="roleFilter" class="form-label">Filter by Role</label>
+            <select 
+              id="roleFilter" 
+              class="form-select" 
+              v-model="filter.role"
+            >
+              <option value="">All Roles</option>
+              <option value="admin">Admin</option>
+              <option value="user">User</option>
+            </select>
+          </div>
+          
+          <div class="col-md-4">
+            <label for="limit" class="form-label">Limit</label>
+            <input
+              type="number"
+              class="form-control"
+              id="limit"
+              v-model="filter.limit"
+              min="1"
+              max="500"
+            >
+          </div>
+          
+          <div class="col-md-4 d-flex gap-2">
+            <button class="btn btn-primary" @click="applyFilters" :disabled="loading">
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Apply Filters
+            </button>
+            <button class="btn btn-secondary" @click="resetFilters">Reset</button>
+          </div>
+        </div>
       </div>
     </div>
     
-    <div v-else>
-      <div class="table-responsive">
-        <table class="table table-striped table-hover">
-          <thead class="table-light">
+    <!-- Users Table -->
+    <div class="card">
+      <div class="card-body">
+        <div v-if="loading" class="text-center my-4">
+          <div class="spinner-border" role="status">
+            <span class="visually-hidden">Loading...</span>
+          </div>
+        </div>
+        
+        <div v-else-if="users.length === 0" class="alert alert-info">
+          No users found matching your criteria.
+        </div>
+        
+        <table v-else class="table table-striped table-hover">
+          <thead>
             <tr>
               <th>Email</th>
+              <th>Display Name</th>
               <th>Role</th>
               <th>Created At</th>
               <th>Actions</th>
@@ -111,6 +203,7 @@ onMounted(() => {
           <tbody>
             <tr v-for="user in users" :key="user.id">
               <td>{{ user.email }}</td>
+              <td>{{ user.displayName || 'Not set' }}</td>
               <td>
                 <span 
                   class="badge" 
@@ -122,44 +215,122 @@ onMounted(() => {
                   {{ user.role }}
                 </span>
               </td>
-              <td>{{ new Date(user.createdAt).toLocaleString() }}</td>
+              <td>{{ formatDate(user.createdAt) }}</td>
               <td>
                 <div class="btn-group">
+                  <button 
+                    class="btn btn-sm btn-outline-primary"
+                    @click="viewUserDetails(user.id)"
+                    title="View Details"
+                  >
+                    <i class="fas fa-eye"></i>
+                  </button>
                   <button 
                     v-if="user.role === 'user'" 
                     class="btn btn-sm btn-outline-danger"
                     @click="changeUserRole(user.id, 'admin')"
-                    :disabled="user.isProcessing"
+                    title="Make Admin"
                   >
-                    <span v-if="user.isProcessing" class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    Make Admin
+                    <i class="fas fa-user-shield"></i>
                   </button>
                   <button 
                     v-if="user.role === 'admin'" 
                     class="btn btn-sm btn-outline-secondary"
                     @click="changeUserRole(user.id, 'user')"
-                    :disabled="user.isProcessing"
+                    title="Remove Admin"
                   >
-                    <span v-if="user.isProcessing" class="spinner-border spinner-border-sm me-1" role="status"></span>
-                    Remove Admin
+                    <i class="fas fa-user"></i>
                   </button>
                 </div>
               </td>
             </tr>
-            <tr v-if="users.length === 0">
-              <td colspan="4" class="text-center">No users found</td>
-            </tr>
           </tbody>
         </table>
       </div>
+    </div>
+    
+    <!-- User Details Modal -->
+    <div v-if="showDetailsModal" class="modal fade show" style="display: block;" tabindex="-1">
+      <div class="modal-dialog modal-lg">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title">User Details</h5>
+            <button type="button" class="btn-close" @click="showDetailsModal = false"></button>
+          </div>
+          <div class="modal-body" v-if="selectedUser">
+            <div class="row mb-3">
+              <div class="col-md-4 text-center mb-3">
+                <div v-if="selectedUser.avatar" class="mb-2">
+                  <img :src="selectedUser.avatar" alt="User Avatar" class="rounded-circle" style="width: 120px; height: 120px; object-fit: cover;">
+                </div>
+                <div v-else class="border rounded-circle d-flex align-items-center justify-content-center" style="width: 120px; height: 120px; margin: 0 auto;">
+                  <i class="fas fa-user fa-4x text-secondary"></i>
+                </div>
+                <h5 class="mt-2">{{ selectedUser.displayName || selectedUser.email }}</h5>
+                <span 
+                  class="badge" 
+                  :class="{
+                    'bg-danger': selectedUser.role === 'admin',
+                    'bg-primary': selectedUser.role === 'user'
+                  }"
+                >
+                  {{ selectedUser.role }}
+                </span>
+              </div>
+              <div class="col-md-8">
+                <table class="table">
+                  <tbody>
+                    <tr>
+                      <th style="width: 30%">Email</th>
+                      <td>{{ selectedUser.email }}</td>
+                    </tr>
+                    <tr>
+                      <th>Gender</th>
+                      <td>{{ selectedUser.gender || 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Age</th>
+                      <td>{{ selectedUser.age || 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Height</th>
+                      <td>{{ selectedUser.height ? `${selectedUser.height} cm` : 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Weight</th>
+                      <td>{{ selectedUser.weight ? `${selectedUser.weight} kg` : 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Fitness Level</th>
+                      <td>{{ selectedUser.fitnessLevel || 'Not set' }}</td>
+                    </tr>
+                    <tr>
+                      <th>Created At</th>
+                      <td>{{ formatDate(selectedUser.createdAt) }}</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
+            <div v-if="selectedUser.goals && selectedUser.goals.length">
+              <h6>Goals</h6>
+              <div class="mb-3">
+                <span v-for="goal in selectedUser.goals" :key="goal" class="badge bg-info me-2 mb-1">{{ goal }}</span>
+              </div>
+            </div>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" @click="showDetailsModal = false">Close</button>
+          </div>
+        </div>
+      </div>
+      <div class="modal-backdrop fade show"></div>
     </div>
   </div>
 </template>
 
 <style scoped>
 .users-container {
-  background-color: #fff;
-  border-radius: 8px;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+  padding: 20px;
 }
 </style> 

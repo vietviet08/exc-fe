@@ -37,6 +37,7 @@ export const getAllLevels = async (activeOnly = false) => {
  */
 export const getLevelsByWorkoutType = async (workoutTypeId, activeOnly = false) => {
   try {
+    console.log('Fetching levels for workout type:', workoutTypeId);
     let q;
     if (activeOnly) {
       q = query(collection(db, COLLECTION_NAME), 
@@ -50,7 +51,9 @@ export const getLevelsByWorkoutType = async (workoutTypeId, activeOnly = false) 
     }
 
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => Level.fromFirestore(doc));
+    const results = querySnapshot.docs.map(doc => Level.fromFirestore(doc));
+    console.log('Found levels:', results.length);
+    return results;
   } catch (error) {
     console.error(`Error getting levels for workout type ${workoutTypeId}:`, error);
     throw error;

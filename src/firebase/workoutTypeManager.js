@@ -37,6 +37,7 @@ export const getAllWorkoutTypes = async (activeOnly = false) => {
  */
 export const getWorkoutTypesByCategory = async (categoryId, activeOnly = false) => {
   try {
+    console.log('Fetching workout types for category:', categoryId);
     let q;
     if (activeOnly) {
       q = query(collection(db, COLLECTION_NAME), 
@@ -50,7 +51,9 @@ export const getWorkoutTypesByCategory = async (categoryId, activeOnly = false) 
     }
 
     const querySnapshot = await getDocs(q);
-    return querySnapshot.docs.map(doc => WorkoutType.fromFirestore(doc));
+    const results = querySnapshot.docs.map(doc => WorkoutType.fromFirestore(doc));
+    console.log('Found workout types:', results.length);
+    return results;
   } catch (error) {
     console.error(`Error getting workout types for category ${categoryId}:`, error);
     throw error;

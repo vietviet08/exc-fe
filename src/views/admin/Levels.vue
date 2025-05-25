@@ -40,7 +40,9 @@ export default {
     // Fetch all workout types
     const fetchWorkoutTypes = async () => {
       try {
-        workoutTypes.value = await getAllWorkoutTypes(true); // Only active workout types
+        // Fetch all workout types, not just active ones
+        workoutTypes.value = await getAllWorkoutTypes(false);
+        console.log('Fetched workout types:', workoutTypes.value.length);
       } catch (err) {
         console.error('Error fetching workout types:', err);
         error.value = 'Failed to load workout types. Please try again.';

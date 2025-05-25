@@ -19,6 +19,10 @@ export default {
       muscleGroup: ''
     });
     
+    // Add missing refs for form inputs
+    const newInstruction = ref('');
+    const newTip = ref('');
+    
     // Predefined muscle groups
     const muscleGroups = [
       'Chest',
@@ -57,7 +61,9 @@ export default {
     // Fetch all levels
     const fetchLevels = async () => {
       try {
-        levels.value = await getAllLevels(true); // Only active levels
+        // Fetch all levels, not just active ones
+        levels.value = await getAllLevels(false);
+        console.log('Fetched levels:', levels.value.length);
       } catch (err) {
         console.error('Error fetching levels:', err);
         error.value = 'Failed to load levels. Please try again.';
@@ -236,7 +242,9 @@ export default {
       resetFilter,
       addArrayItem,
       removeArrayItem,
-      toggleMuscleGroup
+      toggleMuscleGroup,
+      newInstruction,
+      newTip
     };
   }
 };

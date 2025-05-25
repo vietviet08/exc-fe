@@ -40,7 +40,9 @@ export default {
     // Fetch all categories
     const fetchCategories = async () => {
       try {
-        categories.value = await getAllCategories(true); // Only active categories
+        // Fetch all categories, not just active ones
+        categories.value = await getAllCategories(false);
+        console.log('Fetched categories:', categories.value.length);
       } catch (err) {
         console.error('Error fetching categories:', err);
         error.value = 'Failed to load categories. Please try again.';

@@ -3,6 +3,7 @@ import ImageUploader from '@/components/dashboard/ImageUploader.vue';
 import { ref, onMounted } from 'vue';
 import { db } from '@/firebase/config';
 import { collection, addDoc, query, orderBy, getDocs, deleteDoc, doc } from 'firebase/firestore';
+import { cloudinaryService } from '@/services/cloudinary';
 
 export default {
   components: {
@@ -14,7 +15,21 @@ export default {
     const selectedFolder = ref('general');
     const loading = ref(false);
     const uploadStatus = ref('');
+    const selectedImages = ref([]);
+    const showGifModal = ref(false);
+    const gifFrameDelay = ref('500');
 
+    // GIF Creation states
+    const showGifCreator = ref(false);
+    const firstImageUrl = ref('');
+    const secondImageUrl = ref('');
+    const firstImageId = ref('');
+    const secondImageId = ref('');
+    const gifName = ref('');
+    const creatingGif = ref(false);
+    const gifCreationStatus = ref('');
+    const frameDelay = ref(500); // Default frame delay in milliseconds
+    
     const folders = [
       { id: 'general', name: 'General' },
       { id: 'users', name: 'User Profiles' },
@@ -110,6 +125,103 @@ export default {
           console.error('Failed to copy URL:', err);
         });
     };
+    
+    // Toggle image selection for GIF creation
+    const toggleImageSelection = (image) => {
+      const index = selectedImages.value.findIndex(img => img.id === image.id);
+      if (index !== -1) {
+        selectedImages.value.splice(index, 1);
+      } else {
+        // Limit to 2 images for GIF creation
+        if (selectedImages.value.length < 2) {
+          selectedImages.value.push(image);
+        } else {
+          // Replace the first selected image if already have 2
+          selectedImages.value.shift();
+          selectedImages.value.push(image);
+        }
+      }
+    };
+
+    // Check if image is selected
+    const isImageSelected = (image) => {
+      return selectedImages.value.some(img => img.id === image.id);
+    };
+
+    // Open GIF creation modal
+    const openGifModal = () => {
+      if (selectedImages.value.length !== 2) {
+        alert('Please select exactly 2 images to create a GIF');
+        return;
+      }
+      
+      showGifModal.value = true;
+    };
+
+    // Create animated GIF from selected images
+    const createAnimatedGif = async () => {
+      if (selectedImages.value.length !== 2) {
+        uploadStatus.value = 'Please select exactly 2 images to create a GIF';
+        return;
+      }
+      
+      try {
+        loading.value = true;
+        uploadStatus.value = 'Creating animated GIF...';
+        
+        console.log('Selected images for GIF:', selectedImages.value);
+        
+        const [firstImage, secondImage] = selectedImages.value;
+        
+        // Use the original URL directly from the image - let the cloudinary service handle extraction
+        const firstImageUrl = firstImage.url;
+        const secondImageUrl = secondImage.url;
+        
+        console.log('Using image URLs for GIF creation:', { firstImageUrl, secondImageUrl });
+        
+        // Create GIF with cloudinary service
+        const result = await cloudinaryService.uploadAnimatedGif(
+          firstImageUrl, 
+          secondImageUrl, 
+          {
+            frameDelay: parseInt(gifFrameDelay.value),
+            folder: 'animated_gifs',
+            public_id: `animated_${Date.now()}`
+          }
+        );
+        
+        if (result.success) {
+          uploadStatus.value = 'GIF created successfully!';
+          
+          // Save GIF metadata to Firestore
+          await addDoc(collection(db, 'images'), {
+            url: result.url,
+            public_id: result.data.public_id,
+            folder: 'animated_gifs',
+            created_at: new Date(),
+            metadata: {
+              ...result.data,
+              isGif: true,
+              sourceImages: selectedImages.value.map(img => img.id)
+            }
+          });
+          
+          // Reset selections
+          selectedImages.value = [];
+          showGifModal.value = false;
+          
+          // Refresh the image list
+          fetchImages();
+        } else {
+          throw new Error(result.error || 'Failed to create GIF');
+        }
+      } catch (error) {
+        console.error('Error creating GIF:', error);
+        uploadStatus.value = `Error creating GIF: ${error.message}`;
+      } finally {
+        loading.value = false;
+      }
+    };
 
     onMounted(() => {
       fetchImages();
@@ -125,13 +237,79 @@ export default {
       handleUploadSuccess,
       handleUploadError,
       deleteImage,
-      copyToClipboard
+      copyToClipboard,
+      selectedImages,
+      toggleImageSelection,
+      isImageSelected,
+      showGifModal,
+      gifFrameDelay,
+      openGifModal,
+      createAnimatedGif
     };
   }
 };
 </script>
 
 <template>
+  <!-- GIF Creator Modal -->
+  <div v-if="showGifModal" class="modal-backdrop" style="position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(0,0,0,0.5); z-index: 1000; display: flex; align-items: center; justify-content: center;">
+    <div class="card" style="width: 600px; max-width: 95%;">
+      <div class="card-header d-flex justify-content-between align-items-center">
+        <h5 class="mb-0">Create Animated GIF</h5>
+        <button type="button" class="btn-close" @click="showGifModal = false"></button>
+      </div>
+      <div class="card-body">
+        <div class="mb-3">
+          <label class="form-label">Selected Images (2/2)</label>
+          <div class="d-flex gap-2">
+            <div v-for="image in selectedImages" :key="image.id" class="position-relative" style="width: 100px; height: 100px;">
+              <img :src="image.url" class="img-thumbnail" style="width: 100%; height: 100%; object-fit: cover;" />
+              <button 
+                @click="toggleImageSelection(image)" 
+                class="btn btn-sm btn-danger position-absolute" 
+                style="top: 0; right: 0; padding: 2px 5px;"
+              >
+                <i class="fa fa-times"></i>
+              </button>
+            </div>
+          </div>
+        </div>
+        
+        <div class="mb-3">
+          <label class="form-label">Frame Delay (milliseconds)</label>
+          <input 
+            type="range" 
+            class="form-range" 
+            min="100" 
+            max="1000" 
+            step="100" 
+            v-model="gifFrameDelay" 
+          />
+          <div class="d-flex justify-content-between">
+            <small>Fast (100ms)</small>
+            <small>{{ gifFrameDelay }}ms</small>
+            <small>Slow (1000ms)</small>
+          </div>
+        </div>
+        
+        <div class="d-flex justify-content-between">
+          <div>
+            <button 
+              class="btn btn-primary" 
+              @click="createAnimatedGif()" 
+              :disabled="selectedImages.length !== 2 || loading"
+            >
+              <span v-if="loading" class="spinner-border spinner-border-sm me-2"></span>
+              Create GIF
+            </button>
+            <button class="btn btn-secondary ms-2" @click="showGifModal = false">Cancel</button>
+          </div>
+          <div v-if="uploadStatus" class="text-success">{{ uploadStatus }}</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <div class="content-container">
     <h1 class="page-title">Image Manager</h1>
     
@@ -183,6 +361,15 @@ export default {
       </div>
     </div>
     
+    <div class="row mb-4">
+      <div class="col-lg-12 d-flex justify-content-end">
+        <button class="btn btn-primary me-2" @click="openGifModal" :disabled="selectedImages.length !== 2">
+          <i class="fas fa-film me-2"></i> Create Animated GIF 
+          <span v-if="selectedImages.length > 0" class="badge bg-light text-dark ms-1">{{ selectedImages.length }}/2</span>
+        </button>
+      </div>
+    </div>
+    
     <div class="row">
       <div class="col-lg-12">
         <div class="card">
@@ -218,9 +405,10 @@ export default {
                 :key="image.id" 
                 class="col-md-3"
               >
-                <div class="image-card">
+                <div class="image-card" :class="{ 'selected-for-gif': isImageSelected(image) }">
                   <div class="image-preview">
                     <img :src="image.url" alt="Uploaded image" />
+                    <div v-if="image.metadata?.isGif" class="gif-badge">GIF</div>
                   </div>
                   <div class="image-info">
                     <small class="text-muted">Uploaded: {{ new Date(image.created_at.seconds * 1000).toLocaleDateString() }}</small>
@@ -229,6 +417,13 @@ export default {
                   <div class="image-actions">
                     <button class="btn btn-sm btn-info" @click="copyToClipboard(image.url)" title="Copy URL">
                       <i class="fa fa-copy"></i>
+                    </button>
+                    <button 
+                      class="btn btn-sm btn-primary" 
+                      @click="toggleImageSelection(image)" 
+                      title="Toggle selection for GIF"
+                    >
+                      <i class="fa" :class="isImageSelected(image) ? 'fa-check-circle' : 'fa-circle'"></i>
                     </button>
                     <button class="btn btn-sm btn-danger" @click="deleteImage(image)" title="Delete">
                       <i class="fa fa-trash-can"></i>
@@ -272,6 +467,12 @@ export default {
   margin-bottom: 20px;
   overflow: hidden;
   position: relative;
+  transition: all 0.3s ease;
+}
+
+.image-card.selected-for-gif {
+  box-shadow: 0 0 0 3px #0d6efd, 0 1px 5px rgba(0, 0, 0, 0.3);
+  transform: scale(1.02);
 }
 
 .image-preview {
@@ -285,6 +486,18 @@ export default {
   height: 100%;
   object-fit: cover;
   width: 100%;
+}
+
+.gif-badge {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  background-color: #17a2b8;
+  color: white;
+  border-radius: 3px;
+  padding: 2px 6px;
+  font-weight: bold;
+  font-size: 12px;
 }
 
 .image-info {
@@ -308,5 +521,54 @@ export default {
   display: flex;
   justify-content: space-between;
   padding: 8px;
+}
+
+/* GIF Creator styles */
+.image-select-card {
+  border: 2px solid transparent;
+  border-radius: 4px;
+  overflow: hidden;
+  height: 100px;
+  position: relative;
+}
+
+.image-select-card img {
+  height: 100%;
+  object-fit: cover;
+  width: 100%;
+}
+
+.selected-image-1 {
+  border-color: #0d6efd;
+}
+
+.selected-image-2 {
+  border-color: #17a2b8;
+}
+
+.image-select-actions {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 4px;
+  display: flex;
+  justify-content: space-between;
+  opacity: 0;
+  transition: opacity 0.2s;
+}
+
+.image-select-card:hover .image-select-actions {
+  opacity: 1;
+}
+
+.modal-backdrop {
+  animation: fadeIn 0.2s ease;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 </style> 

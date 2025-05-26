@@ -11,6 +11,7 @@ export class Exercise {
     instructions = [],
     duration = 0,
     reps = 0,
+    sets = 0,
     restTime = 0,
     image = '',
     video = '',
@@ -30,6 +31,7 @@ export class Exercise {
     this.instructions = instructions;
     this.duration = duration;
     this.reps = reps;
+    this.sets = sets;
     this.restTime = restTime;
     this.image = image;
     this.video = video;
@@ -54,6 +56,7 @@ export class Exercise {
       instructions: data.instructions || [],
       duration: data.duration || 0,
       reps: data.reps || 0,
+      sets: data.sets || 0,
       restTime: data.restTime || 0,
       image: data.image || '',
       video: data.video || '',
@@ -77,6 +80,7 @@ export class Exercise {
       instructions: this.instructions,
       duration: this.duration,
       reps: this.reps,
+      sets: this.sets,
       restTime: this.restTime,
       image: this.image,
       video: this.video,

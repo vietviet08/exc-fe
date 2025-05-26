@@ -52,19 +52,18 @@ export class UserProgress {
 
   // Convert UserProgress object to Firestore document
   toFirestore() {
-    const now = new Date();
     return {
       userId: this.userId,
       levelId: this.levelId,
       exerciseId: this.exerciseId,
-      completionDate: this.completionDate ? new Date(this.completionDate) : now,
+      completionDate: this.completionDate ? new Date(this.completionDate) : new Date(),
       duration: this.duration,
       repsCompleted: this.repsCompleted,
       setsCompleted: this.setsCompleted,
       caloriesBurned: this.caloriesBurned,
       difficulty: this.difficulty,
       notes: this.notes,
-      createdAt: this.createdAt ? new Date(this.createdAt) : now
+      createdAt: this.createdAt ? new Date(this.createdAt) : new Date()
     };
   }
 } 

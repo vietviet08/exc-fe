@@ -9,7 +9,7 @@ export class Level {
     name = '',
     description = '',
     difficulty = '',
-    durationMinutes = '',
+    extraDescription = '',
     caloriesBurn = 0,
     order = 0,
     isActive = true,
@@ -21,7 +21,7 @@ export class Level {
     this.name = name;
     this.description = description;
     this.difficulty = difficulty;
-    this.durationMinutes = durationMinutes;
+    this.extraDescription = extraDescription;
     this.caloriesBurn = caloriesBurn;
     this.order = order;
     this.isActive = isActive;
@@ -38,7 +38,7 @@ export class Level {
       name: data.name || '',
       description: data.description || '',
       difficulty: data.difficulty || '',
-      durationMinutes: data.durationMinutes || '',
+      extraDescription: data.extraDescription || '',
       caloriesBurn: data.caloriesBurn || 0,
       order: data.order || 0,
       isActive: data.isActive !== false,
@@ -54,7 +54,7 @@ export class Level {
       name: this.name,
       description: this.description,
       difficulty: this.difficulty,
-      durationMinutes: this.durationMinutes,
+      extraDescription: this.extraDescription,
       caloriesBurn: this.caloriesBurn,
       order: this.order,
       isActive: this.isActive,

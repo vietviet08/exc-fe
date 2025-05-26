@@ -8,7 +8,6 @@ export class WorkoutType {
     categoryId = '',
     name = '',
     description = '',
-    equipment = '',
     duration = '',
     difficulty = '',
     image = '',
@@ -21,7 +20,6 @@ export class WorkoutType {
     this.categoryId = categoryId;
     this.name = name;
     this.description = description;
-    this.equipment = equipment;
     this.duration = duration;
     this.difficulty = difficulty;
     this.image = image;
@@ -39,7 +37,6 @@ export class WorkoutType {
       categoryId: data.categoryId || '',
       name: data.name || '',
       description: data.description || '',
-      equipment: data.equipment || '',
       duration: data.duration || '',
       difficulty: data.difficulty || '',
       image: data.image || '',
@@ -56,7 +53,6 @@ export class WorkoutType {
       categoryId: this.categoryId,
       name: this.name,
       description: this.description,
-      equipment: this.equipment,
       duration: this.duration,
       difficulty: this.difficulty,
       image: this.image,

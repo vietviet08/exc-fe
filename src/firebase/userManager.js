@@ -29,12 +29,16 @@ export const verifyAdminAccess = async (user) => {
     return false;
   }
   
-  console.log(`Verifying admin access for user: ${user.email}`);
+  // Handle both user object and user ID string
+  const userId = typeof user === 'string' ? user : user.uid;
+  const userEmail = typeof user === 'string' ? 'Unknown' : user.email;
+  
+  console.log(`Verifying admin access for user ID: ${userId}`);
   
   try {
     // Check the role in Firestore
-    const isAdmin = await checkUserRole(user.uid);
-    console.log(`Firestore role check for ${user.email}: ${isAdmin}`);
+    const isAdmin = await checkUserRole(userId);
+    console.log(`Firestore role check for ${userEmail || userId}: ${isAdmin}`);
     return isAdmin;
   } catch (error) {
     console.error('Error in verifyAdminAccess:', error);

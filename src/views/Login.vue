@@ -1,9 +1,11 @@
 <script setup>
-import { ref, onMounted } from 'vue';
+import { ref, onMounted, computed } from 'vue';
 import { useRouter } from 'vue-router';
 import { useStore } from 'vuex';
 import { signInWithEmailAndPassword, onAuthStateChanged } from 'firebase/auth';
 import { auth } from '../firebase/config';
+import { doc, getDoc } from 'firebase/firestore';
+import { db } from '../firebase/config';
 
 const email = ref('');
 const password = ref('');
@@ -13,26 +15,23 @@ const processingAuth = ref(true);
 const router = useRouter();
 const store = useStore();
 
+// Create a development mode flag that works in both environments
+// This avoids using import.meta.env directly in the template
+const isDevelopment = ref(true);  // Default to true for debugging purposes
+// In production, you'd typically set this to false
+
 // Check authentication state on component mount
-onMounted(() => {
-  const unsubscribe = onAuthStateChanged(auth, (user) => {
-    processingAuth.value = false;
-    if (user) {
-      console.log("Authentication state detected user:", user.email);
-      // User is already logged in, check role and redirect
-      store.dispatch('checkUserRole', user).then((result) => {
-        console.log(`CheckUserRole result for ${user.email}:`, store.state.isAdmin);
-        if (store.state.isAdmin) {
-          router.push('/admin/dashboard');
-        }
-      });
-    } else {
-      console.log("No authenticated user detected");
-    }
-  });
+onMounted(async () => {
+  // Use the new checkAuthState action
+  await store.dispatch('checkAuthState');
+  processingAuth.value = false;
   
-  // Clean up subscription
-  return () => unsubscribe();
+  if (store.state.isAuthenticated && store.state.isAdmin) {
+    console.log("User is already authenticated as admin, redirecting to dashboard");
+    router.push('/admin/dashboard');
+  } else {
+    console.log("No authenticated admin user detected");
+  }
 });
 
 const login = async () => {
@@ -46,9 +45,9 @@ const login = async () => {
     const user = userCredential.user;
     console.log(`Login successful for user: ${user.email}, uid: ${user.uid}`);
     
-    // Check user role
+    // Check user role with the new action
     console.log("Checking user role for admin permissions");
-    await store.dispatch('checkUserRole', user);
+    await store.dispatch('checkAuthState');
     
     if (store.state.isAdmin) {
       console.log(`User ${user.email} authenticated as admin, redirecting to dashboard`);
@@ -66,6 +65,47 @@ const login = async () => {
     } else {
       error.value = `Error: ${err.message}`;
     }
+  } finally {
+    loading.value = false;
+  }
+};
+
+// Add this function to debug user role directly from Firestore
+const debugCheckUserRole = async () => {
+  if (!email.value) {
+    error.value = 'Please enter an email to check';
+    return;
+  }
+  
+  try {
+    error.value = '';
+    loading.value = true;
+    
+    // First sign in to get the UID
+    const userCredential = await signInWithEmailAndPassword(auth, email.value, password.value);
+    const user = userCredential.user;
+    console.log(`Debug: Successfully signed in as ${user.email} with UID ${user.uid}`);
+    
+    // Then check the user document directly
+    const userDocRef = doc(db, 'users', user.uid);
+    const userDoc = await getDoc(userDocRef);
+    
+    if (userDoc.exists()) {
+      const userData = userDoc.data();
+      console.log(`Debug: User document found for ${user.uid}:`, userData);
+      console.log(`Debug: User ${user.email} has role: ${userData.role}`);
+      
+      if (userData.role === 'admin') {
+        console.log(`Debug: User ${user.email} is confirmed as admin`);
+      } else {
+        console.log(`Debug: User ${user.email} is NOT an admin`);
+      }
+    } else {
+      console.log(`Debug: No user document found for UID ${user.uid}`);
+    }
+  } catch (err) {
+    console.error("Debug error:", err);
+    error.value = `Debug error: ${err.message}`;
   } finally {
     loading.value = false;
   }
@@ -140,6 +180,17 @@ const login = async () => {
           >
             <span v-if="loading" class="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
             Log In
+          </button>
+          
+          <!-- Debug Button - Only in development environment -->
+          <button 
+            v-if="isDevelopment"
+            type="button"
+            class="btn btn-outline-secondary w-100 mt-2"
+            @click="debugCheckUserRole"
+            :disabled="loading || !email.value || !password.value"
+          >
+            Debug: Check User Role
           </button>
         </form>
         

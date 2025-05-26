@@ -5,4 +5,5 @@ export * from './WorkoutType';
 export * from './Level';
 export * from './Exercise';
 export * from './WorkoutSession';
-export * from './UserProgress'; 
+export * from './UserProgress';
+export * from './AdminSettings'; 

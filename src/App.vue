@@ -90,8 +90,13 @@ const toggleSidebar = () => {
           </router-link>
         </li>
         <li class="nav-item">
-          <router-link to="/admin/images" class="nav-link">
+          <router-link to="/admin/image-manager" class="nav-link">
             <i class="bi bi-images me-2"></i> Images
+          </router-link>
+        </li>
+        <li class="nav-item">
+          <router-link to="/admin/settings" class="nav-link">
+            <i class="bi bi-gear me-2"></i> Settings
           </router-link>
         </li>
       </ul>
